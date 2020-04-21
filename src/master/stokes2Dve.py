@@ -4,7 +4,6 @@ from importlib import reload
 
 import meshModel
 reload(meshModel)
-
 import numpy as np
 from scipy.interpolate import interp1d # This is used for bed topography
 
@@ -619,7 +618,6 @@ class Stokes2D:
        #p.increment(deps,strain, [1,3], theta, step)
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
-       #"""
 
        (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
            p. return_property(mesh , 1) ,
@@ -631,14 +629,13 @@ class Stokes2D:
        self.ptemp = ptemp
        self.pstrain = pstrain
 
-
        pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
-       #"""
+
 
        #p.interpolate(deps_sol,1)
 
        # Get strain at particle level
-       pstrain_new = np.array(p.get_property(1))
+       #pstrain = p.get_property(1)
        # Make sure strain at particle level is positive definite
        pstrain_new = np.maximum(pstrain_new,0.0)
        p.change_property(pstrain_new,1)
