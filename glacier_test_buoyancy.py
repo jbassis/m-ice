@@ -12,8 +12,6 @@ import material
 reload(material)
 from material import *
 
-from tracers_cython import *
-
 from scipy.special import erfc
 
 
@@ -410,7 +408,7 @@ for i in range(i,100000):
    c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);plt.colorbar(c);plt.axis('equal')
    plt.subplot(2,1,2)
 
-   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=log10(pepsII+1e-16),vmin=-8,vmax=-5);plt.colorbar(c);plt.axis('equal')
+   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(pepsII/material.time_factor+1e-16),vmin=-8,vmax=-5);plt.colorbar(c);plt.axis('equal')
    plt.pause(1e-16);
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
