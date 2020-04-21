@@ -405,10 +405,12 @@ for i in range(i,100000):
 
    plt.figure(1);plt.clf();
    plt.subplot(2,1,1);
-   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);plt.colorbar(c);plt.axis('equal')
+   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);cbar1=plt.colorbar(c); 
+   cbar1.set_ticks([-4,1])
+   plt.axis('equal')
    plt.subplot(2,1,2)
-
-   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(pepsII/material.time_factor+1e-16),vmin=-8,vmax=-5);plt.colorbar(c);plt.axis('equal')
+   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(pepsII/material.time_factor+1e-16),vmin=-8,vmax=-5);cbar2=plt.colorbar(c);plt.axis('equal')
+   cbar2.set_ticks([-8,-5])
    plt.pause(1e-16);
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
