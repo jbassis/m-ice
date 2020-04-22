@@ -21,7 +21,8 @@ pt = sort_boundary_nodes(bmesh)
 
 
 # Remove two points that must be determined by manual inspection
-pts = vstack((pt[0:461,:],pt[465::,:]))## Identify which points to remove
+#pts = vstack((pt[0:461,:],pt[465::,:]))## Identify which points to remove
+pts = pt
 #pts = vstack((pt[0:483,:],pt[294:394,:],pt[397::,:]))## Identify which points to remove
 
 #pts = vstack((pts[0:369,:],pts[414::,:]))## Identify which points to remove
@@ -33,6 +34,7 @@ pt_new = []
 pt_flag = None
 length_flag = True
 xcliff = max_length
+xcliff = 12200.0
 for n in range(len(pts)):
     pt = pts[n]
     # We will stack x points along the calving front if they exceed the distance
@@ -64,17 +66,28 @@ model.mesh.mesh.bounding_box_tree().build(model.mesh.mesh)
 model.mesh.generate_function_spaces()
 
 model.set_mesh(model.mesh)
-model.tracers.set_mesh(model.mesh)
-model.tempModel.set_mesh(model.mesh.mesh)
-model.tracers.update_tracer_interp_functions()
-print('Updated tracer interpolation function')
-node_vars = model.tracers.tracers_to_nodes()
-print('Starting to remove and reseed')
-model.tracers.remove_and_reseed(node_vars,0,length,model.mesh.surf_fun,model.mesh.bed_fun)
-print('Updating tracer interpolation functions')
-model.tracers.update_tracer_interp_functions()
-print('Finished updating tracer interpolation functions')
+
+#model.tracers.set_mesh(model.mesh)
+#model.tempModel.set_mesh(model.mesh.mesh)
+#model.tracers.update_tracer_interp_functions()
+#print('Updated tracer interpolation function')
+#node_vars = model.tracers.tracers_to_nodes()
+#print('Starting to remove and reseed')
+#model.tracers.remove_and_reseed(node_vars,0,length,model.mesh.surf_fun,model.mesh.bed_fun)
+#print('Updating tracer interpolation functions')
+#model.tracers.update_tracer_interp_functions()
+#print('Finished updating tracer interpolation functions')
 #model.u_k = None
+Vdg = FunctionSpace(model.mesh.mesh, 'DG',1)
+Vcg = FunctionSpace(model.mesh.mesh, 'DG',1)
+(xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+  p. return_property(mesh , 1) ,
+  p. return_property(mesh , 2),
+  p. return_property(mesh , 3))
+del p
+p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
+AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
+AD.do_sweep()
 model.u_k = interpolate(model.u_k,model.vector2)
 
 # Now update everything else
