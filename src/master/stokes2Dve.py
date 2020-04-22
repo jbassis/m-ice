@@ -537,17 +537,17 @@ class Stokes2D:
        eta_plas = self.eta_plas
 
        Vdg = FunctionSpace(self.mesh.mesh, 'DG',1)
-       #Vcg = FunctionSpace(self.mesh.mesh, 'DG',1)
+       Vcg = FunctionSpace(self.mesh.mesh, 'DG',1)
 
        #W_e = FiniteElement("DG", self.mesh.mesh.ufl_cell(), 1)
        #Vdg = FunctionSpace(self.mesh.mesh, W_e)
 
        # Variables to store strain and temp
-       strain, temp = Function(Vdg), Function(Vdg)
+       strain, temp = Function(Vdg), Function(Vcg)
        lstsq_strain = l2projection(p, Vdg, 1) # First variable???
        lstsq_strain.project(strain,0,1e6) # Projection is stored in phih0
 
-       lstsq_temp = l2projection(p, Vdg, 2) # First variable???
+       lstsq_temp = l2projection(p, Vcg, 2) # First variable???
        lstsq_temp.project(temp,253.15,273.15) # Projection is stored in phih0
 
        #yielded_nodes = eta_visc>eta_plas
@@ -574,94 +574,34 @@ class Stokes2D:
        #deps = epsII*dt_m
 
 
-       # Define binary variable yielded??
 
-       deps = Function(Vdg)
-       local_project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vdg,deps)
-       deps_sol = deps
-       """
-       q = TestFunction(Vdg)
-       dep = TrialFunction(Vdg)
-       L = inner(dep - strain - Constant(dt_m)*conditional(eta_visc>eta_plas,1,0),q)*dx
-
-       # Solves problem . . . .
-       deps_sol = Function(Vdg)
-       problem = LinearVariationalProblem(lhs(L), rhs(L), deps_sol,[])
-       solver = LinearVariationalSolver(problem)
-       prm = solver.parameters
-       info(prm, False)
-       prm['linear_solver']            = 'mumps'
-       solver.solve()
-
-
-       #local_project(strain + epsII*dt_m,Vdg,deps)
-
-       #local_project(epsII*dt_m,Vdg,deps)
-       #deps = project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vcg)
-       """
-
-       deps_vals = deps_sol.vector().get_local()
-       deps_vals = np.maximum(deps_vals,0.0)
-       deps_sol.vector().set_local(deps_vals)
-       #deps = interpolate(deps,Vdg)
-       self.deps = deps_sol
-
-       #deps = project(strain + epsII*dt_m,Vdg)
-
-       #deps_dt = epsII
-
-
-       #theta = 1
-       #step = 1
-       #deps_dt = project(deps_dt,Q)
-
-       #p.increment(deps,strain, [1,3], theta, step)
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
+       if self.method==1:
+           	deps_sol = Function(Vdg)
+           	local_project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vdg,deps_sol)
+           	deps_vals = deps_sol.vector().get_local()
+           	deps_vals = np.maximum(deps_vals,0.0)
+           	deps_sol.vector().set_local(deps_vals)
+           	p.interpolate(deps_sol,1)
+           	pstrain_new = p.get_property(1)
+       else:
+           	# Increment based at the particle level
+           	(xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+           	    p. return_property(mesh , 1) ,
+            	   p. return_property(mesh , 2),
+               	p. return_property(mesh , 3))
+           	pepsII = np.maximum(pepsII,0.0)
+           	p.change_property(pepsII,3)
+           	pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
 
-       (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
-           p. return_property(mesh , 1) ,
-           p. return_property(mesh , 2),
-           p. return_property(mesh , 3))
-       pepsII = np.maximum(pepsII,0.0)
-
-       self.pepsII = pepsII
-       self.ptemp = ptemp
-       self.pstrain = pstrain
-
-       pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
-
-
-       #p.interpolate(deps_sol,1)
 
        # Get strain at particle level
-       #pstrain = p.get_property(1)
        # Make sure strain at particle level is positive definite
        pstrain_new = np.maximum(pstrain_new,0.0)
        p.change_property(pstrain_new,1)
        ap = advect_rk3(p, self.vector2, u, "open")
        ap.do_step(dt_m)
-       """
-       x1,z1 = self.tracers.get_coords() # Initial coordinates of tracers
-
-       marker_points_original = self.tracers.x
-       x1 = np.copy(marker_points_original[:,0])
-       z1 = np.copy(marker_points_original[:,1])
-
-       ux_eff = ux1
-       uz_eff = uz1
-
-       deps_eff = deps1
-       deps_m = deps_eff
-
-       # Update tracer positions
-       self.tracers.x[:,0]= x1 + ux_eff*dt_m
-       self.tracers.x[:,1]= z1 + uz_eff*dt_m
-       print('Finished updating tracer positions')
-       """
-       # Update plastic strains based on effective strain rates
-       #if self.visc_func.plastic==True:
-       #   self.tracers.tracers['Strain']+=deps_m*dt_m
 
 
        print('Starting to remesh')
@@ -735,7 +675,7 @@ class Stokes2D:
 
        self.strain = strain
        self.temp = temp
-       self.epsII = epsII
+       self.epsII = project(epsII,Vdg)
 
        """
        self.tracers.update_tracer_interp_functions()
