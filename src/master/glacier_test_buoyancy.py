@@ -74,7 +74,8 @@ length= ice_thick*12
 water_depth = ice_thick*910.0/1020 - Hab
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333)
+dz = round(ice_thick/13.333333333*2)
+dz = 80.0
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
@@ -192,7 +193,7 @@ model.tracers = particles
 
 model.calving_front = True # This applies a stress boundary condition to the right edge
 model.alpha = 1.0  # Not used anymore, legacy from when we used overrelaxation
-model.water_drag = 0.0 # Quadratic drag term associated with water drag
+model.water_drag = 1e5 # Quadratic drag term associated with water drag
 # Add lateral drag to model
 B = 0.75e8
 width = 10e3
@@ -217,8 +218,8 @@ max_length = 1.375*length# Regrid if length exceeds this value
 #dmax_length = 11.75e3
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
-save_files = False# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_min_yield_20_surf_slope_0.02_med_visc_bed_slope_0.01_flux_1.0_CFL/'
+save_files = True# Set to True if we want to save output files
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_0.0_method5/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -226,7 +227,7 @@ if save_files==True:
 
 
 input_flux = left_vel*(surf_fun(0.0)-bot_fun(0.0)) # Define input flux at left edge of the domain
-CFL = 0.5
+CFL = 0.2
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
@@ -270,10 +271,6 @@ for i in range(i,100000):
        remesh_elastic=False
        model.mesh.length=min_length
 
-   if model.mesh.mesh.hmax()/model.mesh.mesh.hmin() > 10.0:
-       remesh_elastic=False
-       model.mesh.length=min_length
-
    quality=np.min(MeshQuality.radius_ratios(model.mesh.mesh).array())
    if quality<0.1:
        remesh_elastic=False
@@ -283,79 +280,6 @@ for i in range(i,100000):
    print(remesh_elastic)
 
 
-
-   # Now plot some stuff
-   #xm,zm = particles.get_coords()
-   """
-   plt.figure(1);plt.clf()
-   title_str = 'Time: '+str(round(t*material.time_factor/material.secpera,2)).zfill(4)+ ' a'
-
-
-   # First plot is total plastic strain
-   ax1=plt.subplot(3,1,1)
-   if glenVisc.plastic==True:
-       #c=plt.scatter(xm,zm,s=1,c=np.log10(model.deps_m+1e-16),vmin=-10,vmax=0)
-       #cbar1=plt.colorbar(c)
-       c=plt.scatter(xm,zm,s=1,c=np.log10(np.maximum(particles.tracers['Strain'],1e-16)),vmin=-4,vmax=1);cbar1=plt.colorbar(c);plt.axis('equal');cbar1.set_ticks([-4,1])
-       cbar1.set_label('$\epsilon_p$', fontsize=12)
-       plt.axis('equal')
-       cbar1.set_ticks([-4,1])
-       cbar1.set_label('$\Delta \epsilon_p$', fontsize=12)
-       plt.title(title_str)
-       plt.xlim([0,max_length])
-
-
-   # Second plot is effective strain rate
-   ax3=plt.subplot(3,1,2)
-   epsII_m = model.epsII_m#model.tracers.nodes_to_tracers(model.epsII)
-   c=plt.scatter(xm,zm, s=1,c=np.log10(epsII_m/material.time_factor+1e-16),vmin=-13,vmax=-7);cbar3=plt.colorbar(c);plt.axis('equal');cbar3.set_ticks([-13,-7])
-   cbar3.set_label('$\epsilon_{II}$ (s$^{-1}$)',fontsize=12)
-   plt.xlim([0,max_length])
-
-
-   # Second plot is effective viscosity
-   ax2=plt.subplot(3,1,3)
-   #speed_m = np.sqrt(particles.tracers['ux']**2+particles.tracers['uz']**2)
-   #c=plt.scatter(xm,zm, s=1,c=speed_m,vmin=0,vmax=2*10**4);cbar2=plt.colorbar(c);plt.axis('equal');cbar2.set_ticks([0,2*10**4])
-   #cbar2.set_label('speed', fontsize=12)
-   #c=plot(Tmodel.Temp-273.15)
-   #cbar2 = plt.colorbar(c)
-   #cbar2.set_label('Temp', fontsize=12)
-
-   plt.xlabel('Distance (km)')
-   plt.xlim([0,max_length])
-   xx=np.linspace(0,length*1.5,101)
-   xs=np.linspace(0,length,101)
-   b = bot_fun(xx)
-   Habx = bot_fun(xx)-bot_fun(xx)*1020.0/920.0
-   for ax in [ax1,ax2,ax3]:
-       ax.set_xticks([])
-       ax.set_yticks([])
-       ax.spines['right'].set_visible(False)
-       ax.spines['top'].set_visible(False)
-       ax.spines['left'].set_visible(False)
-       ax.spines['bottom'].set_visible(False)
-       ax.plot(xx,bot_fun(xx),color='brown',linewidth=2)
-       ax.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
-       ax.plot(xx,Habx,'--b',linewidth=2)
-       ax.plot(xs,surf_fun(xs),'--',color='gray')
-   ax2.spines['bottom'].set_visible(True)
-   ax2.set_xticks([0,3e3,10*ice_thick,max_length])
-   ax2.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
-   plt.xlim([0,max_length])
-
-   ax1.spines['bottom'].set_visible(True)
-   ax1.set_xticks([0,3e3,10*ice_thick,max_length])
-   ax1.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
-   plt.xlim([0,max_length])
-
-   ax3.spines['bottom'].set_visible(True)
-   ax3.set_xticks([0,3e3,10*ice_thick,max_length])
-   ax3.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
-   plt.xlim([0,max_length])
-
-   plt.draw();plt.pause(1e-16);plt.show()
-   """
    if np.mod(i,10)==0:
        #particles.tracers['Strain'][xm<3.5e3]=0.0
        if save_files == True:
@@ -372,15 +296,14 @@ for i in range(i,100000):
            #eta_m = model.tracers.nodes_to_tracers(model.eta)
            fname =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.npz'
            print(fname)
-           np.savez(fname, t=t, xm=x[:,0],zm=xp[:,1],speed=speed,ux=ux,uz=uz,strain=pstrain,
+           np.savez(fname, t=t, xm=xp[:,0],zm=xp[:,1],speed=speed,ux=ux,uz=uz,strain=pstrain,
                 epsII=pepsII/material.time_factor,temp=ptemp)
 
            mesh_file_name =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.xml'
            mesh_file = File(mesh_file_name)
            mesh_file << model.mesh.mesh
            temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
-           temp_file=HDF5File(mpi_comm_world(), temp_file_name, 'w')
-           temp_file.write(Tmodel.Temp,'Temp')
+           temp_file=HDF5File(mesh.mesh.mpi_comm(), temp_file_name, 'w')
            temp_file.write(u,'u')
            temp_file.close()
 
@@ -398,7 +321,8 @@ for i in range(i,100000):
    p. return_property(mesh , 1) ,
    p. return_property(mesh , 2),
    p. return_property(mesh , 3))
-
+   pstrain[xp[:,0]<1e3]=0.0
+   p.change_property(pstrain,1)
 
    if remesh_elastic == False:
 
@@ -420,22 +344,41 @@ for i in range(i,100000):
    xs=np.linspace(0,length,101)
 
    plt.figure(1);plt.clf();
-   plt.subplot(2,1,1);
+   ax1=plt.subplot(2,1,1);
    c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);cbar1=plt.colorbar(c);
-   plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
-   plt.plot(xs,surf_fun(xs),'--',color='gray')
+   #plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
+   #plt.plot(xs,surf_fun(xs),'--',color='gray')
    cbar1.set_ticks([-4,1])
    plt.axis('equal')
    plt.title(title_str)
    plt.xlim([0,max_length])
-   plt.subplot(2,1,2)
+   ax2=plt.subplot(2,1,2)
    c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(pepsII/material.time_factor+1e-16),vmin=-8,vmax=-5);cbar2=plt.colorbar(c);plt.axis('equal')
-   plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
-   plt.plot(xs,surf_fun(xs),'--',color='gray')
+   #plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
+   #plt.plot(xs,surf_fun(xs),'--',color='gray')
    cbar2.set_ticks([-8,-5])
-   plt.title(title_str)
+   #plt.title(title_str)
    plt.xlim([0,max_length])
    plt.xlabel('Distance (km)')
+   for ax in [ax1,ax2]:
+       ax.set_xticks([])
+       ax.set_yticks([])
+       ax.spines['right'].set_visible(False)
+       ax.spines['top'].set_visible(False)
+       ax.spines['left'].set_visible(False)
+       ax.spines['bottom'].set_visible(False)
+       ax.plot(xx,bot_fun(xx),color='brown',linewidth=2)
+       ax.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
+       ax.plot(xs,surf_fun(xs),'--',color='gray')
+   ax2.spines['bottom'].set_visible(True)
+   ax2.set_xticks([0,3e3,10*ice_thick,max_length])
+   ax2.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
+   plt.xlim([0,max_length])
+
+   ax1.spines['bottom'].set_visible(True)
+   ax1.set_xticks([0,3e3,10*ice_thick,max_length])
+   ax1.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
+   plt.xlim([0,max_length])
    plt.pause(1e-16);
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
