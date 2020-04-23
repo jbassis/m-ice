@@ -80,7 +80,7 @@ Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =   0.01
+bed_slope =  -0.01
 
 L = length+ice_thick*0
 bump_width = ice_thick
@@ -115,9 +115,9 @@ print('Time to make mesh and basis functions',time.time()-start)
 # Create particles defined on mesh
 #xm,zm = mesh.get_coords();xmin = np.min(xm); xmax=np.max(xm);ymin = np.min(zm); ymax=np.max(zm)
 #xp = RandomRectangle(Point(xmin, ymin), Point(xmax, ymax)).generate([Nx*10, Nz*10])
-tracers_per_cell = 4
+p_min = 15
 gen = RandomCell(mesh.mesh)
-xp = gen.generate(tracers_per_cell)
+xp = gen.generate(p_min)
 #_____________________________________________
 # Define function space for strain and temperature function
 Vdg = FunctionSpace(mesh.mesh, 'DG',1)
@@ -137,13 +137,14 @@ epsII_mesh.assign(strain_init)
 pstrain = assign_particle_values(xp, strain_fun)
 pepsII = assign_particle_values(xp, strain_fun)
 ptemp = assign_particle_values(xp, temp_fun)
+pyielded = assign_particle_values(xp, strain_fun)
+
 
 # Now we initialize the particle class
-p = particles(xp, [pstrain,ptemp,pepsII], mesh.mesh)
+p = particles(xp, [pstrain,ptemp,pepsII,pyielded], mesh.mesh)
 
 # Make sure we have enough particles per cell
-p_min = tracers_per_cell
-p_max = 12
+p_max = 40
 AD = AddDelete(p, p_min, p_max, [strain_mesh, temp_mesh,epsII_mesh]) # Sweep over mesh to delete/insert particles
 AD.do_sweep()
 
@@ -175,7 +176,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 1e3/material.secpera*material.time_factor
+left_vel = 0e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -191,7 +192,7 @@ model.tracers = particles
 
 model.calving_front = True # This applies a stress boundary condition to the right edge
 model.alpha = 1.0  # Not used anymore, legacy from when we used overrelaxation
-model.water_drag = 1e5 # Quadratic drag term associated with water drag
+model.water_drag = 0.0 # Quadratic drag term associated with water drag
 # Add lateral drag to model
 B = 0.75e8
 width = 10e3
@@ -213,6 +214,7 @@ t = 0.0
 it_type = 'Picard'
 
 max_length = 1.375*length# Regrid if length exceeds this value
+#dmax_length = 11.75e3
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = False# Set to True if we want to save output files
@@ -224,10 +226,12 @@ if save_files==True:
 
 
 input_flux = left_vel*(surf_fun(0.0)-bot_fun(0.0)) # Define input flux at left edge of the domain
-CFL = 0.2
+CFL = 0.5
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
+
+model.method = 4
 for i in range(i,100000):
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
@@ -351,23 +355,25 @@ for i in range(i,100000):
    plt.xlim([0,max_length])
 
    plt.draw();plt.pause(1e-16);plt.show()
+   """
    if np.mod(i,10)==0:
        #particles.tracers['Strain'][xm<3.5e3]=0.0
        if save_files == True:
            #uxm = particles.tracers['ux']
            #uzm = particles.tracers['uz']
-           eta_visc_m = model.eta_visc_m
-           eta_plas_m = model.eta_plas_m
-           eta_m = model.eta_m
+           (xp , pstrain , ptemp, pepsII,pyielded) = (p. return_property(mesh , 0) ,
+             p. return_property(mesh , 1) ,
+             p. return_property(mesh , 2),
+             p. return_property(mesh , 3),
+             p. return_property(mesh , 4))
+
            #eta_visc_m = model.tracers.nodes_to_tracers(model.eta_visc)
            #eta_plas_m = model.tracers.nodes_to_tracers(model.eta_plas)
            #eta_m = model.tracers.nodes_to_tracers(model.eta)
            fname =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.npz'
            print(fname)
-           np.savez(fname, t=t, xm=xm,zm=zm,speed=speed,ux=ux,uz=uz,strain=particles.tracers['Strain'],
-                epsII=epsII_m/material.time_factor,eta=eta_m*material.time_factor,
-                eta_visc_m=eta_visc_m*material.time_factor,
-                eta_plas_m=eta_plas_m)
+           np.savez(fname, t=t, xm=x[:,0],zm=xp[:,1],speed=speed,ux=ux,uz=uz,strain=pstrain,
+                epsII=pepsII/material.time_factor,temp=ptemp)
 
            mesh_file_name =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.xml'
            mesh_file = File(mesh_file_name)
@@ -379,9 +385,15 @@ for i in range(i,100000):
            temp_file.close()
 
 
-   """
    # Update all quantities (need to update this to simplify it and use RK4 if specified)
    time_step = model.update(u,time_step,p,remesh_elastic=remesh_elastic)
+   yr = int(np.mod(t,365))
+   #day = round((t - yr)*365,1)
+   day = (t - yr)*365
+   hr,day = np.modf(day)
+   hr = round(hr*24,0)
+   title_str = 'Time: '+str(yr).zfill(1)+ 'a '+str(int(day)).zfill(1)+'d '+str(int(hr)).zfill(1)+'hr'
+   #title_str = 'Time: '+str(round(t*material.time_factor/material.secpera,2)).zfill(4)+ ' a'
    (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
    p. return_property(mesh , 1) ,
    p. return_property(mesh , 2),
@@ -392,35 +404,47 @@ for i in range(i,100000):
 
        Vdg = FunctionSpace(model.mesh.mesh, 'DG',1)
        Vcg = FunctionSpace(model.mesh.mesh, 'DG',1)
-       (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+       (xp , pstrain , ptemp, pepsII,pyielded) = (p. return_property(mesh , 0) ,
           p. return_property(mesh , 1) ,
           p. return_property(mesh , 2),
-          p. return_property(mesh , 3))
+          p. return_property(mesh , 3),
+          p. return_property(mesh , 4))
        del p
-       p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
+       p = particles(xp, [pstrain,ptemp,pepsII,pyielded], model.mesh.mesh)
 
 
-   AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
+   AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg),interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
+
+   xx=np.linspace(0,length*1.5,101)
+   xs=np.linspace(0,length,101)
 
    plt.figure(1);plt.clf();
    plt.subplot(2,1,1);
-   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);cbar1=plt.colorbar(c); 
+   c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);cbar1=plt.colorbar(c);
+   plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
+   plt.plot(xs,surf_fun(xs),'--',color='gray')
    cbar1.set_ticks([-4,1])
    plt.axis('equal')
+   plt.title(title_str)
+   plt.xlim([0,max_length])
    plt.subplot(2,1,2)
    c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(pepsII/material.time_factor+1e-16),vmin=-8,vmax=-5);cbar2=plt.colorbar(c);plt.axis('equal')
+   plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
+   plt.plot(xs,surf_fun(xs),'--',color='gray')
    cbar2.set_ticks([-8,-5])
+   plt.title(title_str)
+   plt.xlim([0,max_length])
+   plt.xlabel('Distance (km)')
    plt.pause(1e-16);
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
 
-   print ('coordinates of first particle',xp[0],np.max(pstrain),np.min(pstrain))
-   print ('coordinates of first particle',xp[0],np.max(ptemp),np.min(ptemp))
+
 
    # Print some diagnostics to screen for debugging purpose
    t = t+time_step
    print('*******************************************')
-   print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
+   print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step, 'Max velocity',np.max(speed))
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')

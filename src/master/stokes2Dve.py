@@ -447,7 +447,7 @@ class Stokes2D:
 
 
 
-       """
+       #"""
        epsII = Function(Q)
        eps1 = Function(Q)
        eps2 = Function(Q)
@@ -465,18 +465,27 @@ class Stokes2D:
        eta_plas = 0.5*tau_y/epsII
        eta =  0.5*self.visc_func.visc_min/time_factor + (1.0/eta_visc + 2.0*epsII/tau_y + 2.0/(self.visc_func.visc_max/time_factor))**(-1.0)
 
-       self.epsII = epsII
+       #self.epsII = epsII
 
        # Save for debugging
-       self.eta =eta
-       self.eta_visc=eta_visc
-       self.eta_plas = eta_plas
+       #self.eta =eta
+       #self.eta_visc=eta_visc
+       #self.eta_plas = eta_plas
+
+       self.epsII = Function(Q)
+       self.epsII.vector().set_local(epsII)
+       self.eta_visc = Function(Q)
+       self.eta_visc.vector().set_local(eta_visc)
+       self.eta_plas=Function(Q)
+       self.eta_plas.vector().set_local(eta_plas)
+
+
 
        # Make sure viscosity is never negative (interpolated viscosity can be negative!)
        assert(np.min(eta_plas)>0.0)
        assert(np.min(eta)>0.0)
        assert(np.min(eta_visc)>0.0)
-       """
+       #"""
 
        """
 
@@ -578,22 +587,43 @@ class Stokes2D:
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
        if self.method==1:
-           	deps_sol = Function(Vdg)
-           	local_project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vdg,deps_sol)
-           	deps_vals = deps_sol.vector().get_local()
-           	deps_vals = np.maximum(deps_vals,0.0)
-           	deps_sol.vector().set_local(deps_vals)
-           	p.interpolate(deps_sol,1)
-           	pstrain_new = p.get_property(1)
+            is_yielded = project(conditional(eta_visc>eta_plas,1,0),Vcg)
+            p.interpolate(is_yielded,4)
+            pyielded = p.get_property(4)
+            pepsII = p.get_property(3)
+            pepsII = np.maximum(pepsII,0.0)
+            p.change_property(pepsII,3)
+            pstrain = p.get_property(1)
+            pstrain_new = pstrain + np.minimum(np.maximum(pyielded,0.0),1.0)*np.maximum(pepsII,0.0)*dt_m
+       elif self.method==2:
+           deps_sol = Function(Vdg)
+           local_project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vdg,deps_sol)
+           deps_vals = deps_sol.vector().get_local()
+           deps_vals = np.maximum(deps_vals,0.0)
+           deps_sol.vector().set_local(deps_vals)
+           p.interpolate(deps_sol,1)
+           pstrain_new = p.get_property(1)
+
+       elif self.method==3:
+            is_yielded = Function(Vdg)
+            tmp = eta_visc.vector().get_local()>eta_plas.vector().get_local()
+            is_yielded.vector().set_local(tmp)
+            p.interpolate(is_yielded,4)
+            pyielded = p.get_property(4)
+            pepsII = p.get_property(3)
+            pepsII = np.maximum(pepsII,0.0)
+            p.change_property(pepsII,3)
+            pstrain = p.get_property(1)
+            pstrain_new = pstrain + np.minimum(np.maximum(pyielded,0.0),1.0)*np.maximum(pepsII,0.0)*dt_m
        else:
-           	# Increment based at the particle level
-           	(xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
-           	    p. return_property(mesh , 1) ,
-            	   p. return_property(mesh , 2),
+           # Increment based at the particle level
+           (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+                p. return_property(mesh , 1) ,
+                p. return_property(mesh , 2),
                	p. return_property(mesh , 3))
-           	pepsII = np.maximum(pepsII,0.0)
-           	p.change_property(pepsII,3)
-           	pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
+           pepsII = np.maximum(pepsII,0.0)
+           p.change_property(pepsII,3)
+           pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
 
 
        # Get strain at particle level
