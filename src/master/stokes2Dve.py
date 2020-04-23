@@ -586,6 +586,8 @@ class Stokes2D:
 
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
+       pstrain = p.return_property(self.mesh.mesh,1)
+       xp = p.return_property(self.mesh.mesh,0)
        if self.method==1:
             is_yielded = project(conditional(eta_visc>eta_plas,1,0),Vcg)
             p.interpolate(is_yielded,4)
@@ -593,7 +595,6 @@ class Stokes2D:
             pepsII = p.get_property(3)
             pepsII = np.maximum(pepsII,0.0)
             p.change_property(pepsII,3)
-            pstrain = p.get_property(1)
             pstrain_new = pstrain + np.minimum(np.maximum(pyielded,0.0),1.0)*np.maximum(pepsII,0.0)*dt_m
        elif self.method==2:
            deps_sol = Function(Vdg)
@@ -603,7 +604,6 @@ class Stokes2D:
            deps_sol.vector().set_local(deps_vals)
            p.interpolate(deps_sol,1)
            pstrain_new = p.get_property(1)
-
        elif self.method==3:
             is_yielded = Function(Vdg)
             tmp = eta_visc.vector().get_local()>eta_plas.vector().get_local()
@@ -613,8 +613,17 @@ class Stokes2D:
             pepsII = p.get_property(3)
             pepsII = np.maximum(pepsII,0.0)
             p.change_property(pepsII,3)
-            pstrain = p.get_property(1)
             pstrain_new = pstrain + np.minimum(np.maximum(pyielded,0.0),1.0)*np.maximum(pepsII,0.0)*dt_m
+       elif self.method==4:
+           deps_sol = Function(Vdg)
+           local_project(conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vdg,deps_sol)
+           deps_vals = deps_sol.vector().get_local()
+           deps_vals = np.maximum(deps_vals,0.0)
+           deps_sol.vector().set_local(deps_vals)
+           p.interpolate(deps_sol,4)
+           pdeps = np.maximum(p.return_property(self.mesh.mesh,4),0.0)
+           pstrain_new = pstrain + pdeps
+           pstrain_new[xp[:,0]<1e3]=0.0
        else:
            # Increment based at the particle level
            (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
@@ -624,6 +633,7 @@ class Stokes2D:
            pepsII = np.maximum(pepsII,0.0)
            p.change_property(pepsII,3)
            pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
+           pstrain_new[xp[:,0]<1e3]=0.0
 
 
        # Get strain at particle level
@@ -791,7 +801,7 @@ class Stokes2D:
            GAMMA_3 = Right()
            GAMMA_3.mark(self.boundary_parts, 2)
 
-       # First trial step for RK4 method
+       # First trial step for RK3 method
        initial_coords = self.mesh.mesh.coordinates()
        x1 = np.copy(self.mesh.mesh.coordinates()[:,0])
        z1 = np.copy(self.mesh.mesh.coordinates()[:,1])
