@@ -809,7 +809,11 @@ class Stokes2D:
        u1 = interpolate(vel, VectorFunctionSpace(self.mesh.mesh, "CG", self.degree))
        ux1,uz1=u1.split()
 
+
+
        # Effective velocity
+       #new_mesh = Mesh(self.mesh.mesh)
+
        Q = VectorFunctionSpace(self.mesh.mesh, "CG", self.degree) # Function Space
        uq = interpolate(vel,Q)
        uq.vector()[:]=u1.vector().get_local()
