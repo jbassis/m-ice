@@ -115,9 +115,10 @@ print('Time to make mesh and basis functions',time.time()-start)
 # Create particles defined on mesh
 #xm,zm = mesh.get_coords();xmin = np.min(xm); xmax=np.max(xm);ymin = np.min(zm); ymax=np.max(zm)
 #xp = RandomRectangle(Point(xmin, ymin), Point(xmax, ymax)).generate([Nx*10, Nz*10])
-tracers_per_cell = 4
+p_min = 8
+p_max = 16
 gen = RandomCell(mesh.mesh)
-xp = gen.generate(tracers_per_cell)
+xp = gen.generate(p_min)
 #_____________________________________________
 # Define function space for strain and temperature function
 Vdg = FunctionSpace(mesh.mesh, 'DG',1)
@@ -142,8 +143,6 @@ ptemp = assign_particle_values(xp, temp_fun)
 p = particles(xp, [pstrain,ptemp,pepsII], mesh.mesh)
 
 # Make sure we have enough particles per cell
-p_min = tracers_per_cell
-p_max = 12
 AD = AddDelete(p, p_min, p_max, [strain_mesh, temp_mesh,epsII_mesh]) # Sweep over mesh to delete/insert particles
 AD.do_sweep()
 
@@ -175,7 +174,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 1e3/material.secpera*material.time_factor
+left_vel = 0e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -216,7 +215,7 @@ max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.01_flux_1.0/'
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.01_flux_0.0/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -228,8 +227,6 @@ CFL = 0.2
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
-
-model.method = 6
 for i in range(i,100000):
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
@@ -268,6 +265,10 @@ for i in range(i,100000):
        remesh_elastic=False
        model.mesh.length=min_length
 
+   if model.mesh.mesh.hmax()/model.mesh.mesh.hmin() > 10.0:
+       remesh_elastic=False
+       model.mesh.length=min_length
+
    quality=np.min(MeshQuality.radius_ratios(model.mesh.mesh).array())
    if quality<0.1:
        remesh_elastic=False
@@ -275,33 +276,31 @@ for i in range(i,100000):
 
    #remesh_elastic = False
    print(remesh_elastic)
-
-
    if np.mod(i,10)==0:
-       #particles.tracers['Strain'][xm<3.5e3]=0.0
-       if save_files == True:
-           #uxm = particles.tracers['ux']
-           #uzm = particles.tracers['uz']
-           (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
-             p. return_property(mesh , 1) ,
-             p. return_property(mesh , 2),
-             p. return_property(mesh , 3))
+      #particles.tracers['Strain'][xm<3.5e3]=0.0
+      if save_files == True:
+          #uxm = particles.tracers['ux']
+          #uzm = particles.tracers['uz']
+          (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+            p. return_property(mesh , 1) ,
+            p. return_property(mesh , 2),
+            p. return_property(mesh , 3))
 
-           #eta_visc_m = model.tracers.nodes_to_tracers(model.eta_visc)
-           #eta_plas_m = model.tracers.nodes_to_tracers(model.eta_plas)
-           #eta_m = model.tracers.nodes_to_tracers(model.eta)
-           fname =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.npz'
-           print(fname)
-           np.savez(fname, t=t, xm=xp[:,0],zm=xp[:,1],speed=speed,ux=ux,uz=uz,strain=pstrain,
-                epsII=pepsII/material.time_factor,temp=ptemp)
+          #eta_visc_m = model.tracers.nodes_to_tracers(model.eta_visc)
+          #eta_plas_m = model.tracers.nodes_to_tracers(model.eta_plas)
+          #eta_m = model.tracers.nodes_to_tracers(model.eta)
+          fname =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.npz'
+          print(fname)
+          np.savez(fname, t=t, xm=xp[:,0],zm=xp[:,1],speed=speed,ux=ux,uz=uz,strain=pstrain,
+               epsII=pepsII/material.time_factor,temp=ptemp)
 
-           mesh_file_name =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.xml'
-           mesh_file = File(mesh_file_name)
-           mesh_file << model.mesh.mesh
-           temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
-           temp_file=HDF5File(model.mesh.mesh.mpi_comm(), temp_file_name, 'w')
-           temp_file.write(u,'u')
-           temp_file.close()
+          mesh_file_name =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.xml'
+          mesh_file = File(mesh_file_name)
+          mesh_file << model.mesh.mesh
+          temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
+          temp_file=HDF5File(model.mesh.mesh.mpi_comm(), temp_file_name, 'w')
+          temp_file.write(u,'u')
+          temp_file.close()
 
 
    # Update all quantities (need to update this to simplify it and use RK4 if specified)
@@ -312,24 +311,22 @@ for i in range(i,100000):
    hr,day = np.modf(day)
    hr = round(hr*24,0)
    title_str = 'Time: '+str(yr).zfill(1)+ 'a '+str(int(day)).zfill(1)+'d '+str(int(hr)).zfill(1)+'hr'
-   #title_str = 'Time: '+str(round(t*material.time_factor/material.secpera,2)).zfill(4)+ ' a'
    (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
    p. return_property(mesh , 1) ,
    p. return_property(mesh , 2),
    p. return_property(mesh , 3))
-   pstrain[xp[:,0]<1e3]=0.0
-   p.change_property(pstrain,1)
+
 
    if remesh_elastic == False:
 
        Vdg = FunctionSpace(model.mesh.mesh, 'DG',1)
        Vcg = FunctionSpace(model.mesh.mesh, 'DG',1)
-       (xp , pstrain , ptemp, pepsII,pyielded) = (p. return_property(mesh , 0) ,
+       (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
           p. return_property(mesh , 1) ,
           p. return_property(mesh , 2),
           p. return_property(mesh , 3))
        del p
-       p = particles(xp, [pstrain,ptemp,pepsII,pyielded], model.mesh.mesh)
+       p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
 
 
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
@@ -377,12 +374,9 @@ for i in range(i,100000):
    plt.pause(1e-16);
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
-
-
-
    # Print some diagnostics to screen for debugging purpose
    t = t+time_step
    print('*******************************************')
-   print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step, 'Max velocity',np.max(speed))
+   print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')

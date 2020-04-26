@@ -17,7 +17,6 @@ from leopart import (
     particles,
     RandomRectangle,
     l2projection,
-    advect_particles,
     advect_rk3,
     assign_particle_values,
     AddDelete
@@ -438,84 +437,9 @@ class Stokes2D:
            print("WARNING: MAXIMUM NUMBER OF ITERATIONS EXCEEDED")
        self.u_k = u_k
        self.u=u
-       #self.p_k = p_k
        self.u_p = w
        self.u = u
        self.p = p
-
-       # Step 1, establish our function spaces for projections
-       Q = self.mesh.Q      # Linear elements
-
-
-
-       """
-       epsII = Function(Q)
-       eps1 = Function(Q)
-       eps2 = Function(Q)
-       eps = epsilon(u)
-       local_project(eps[0,0],Q,eps1)
-       local_project(eps[0,1],Q,eps2)
-       epsII = np.sqrt(eps1.vector().get_local()**2+eps2.vector().get_local()**2)
-
-       self.epsII=epsII
-       temp1=temp.vector().get_local()
-       Bdisl = (self.visc_func.pre1*np.exp(self.visc_func.E1/(3.0*8.314*temp1))*(temp1<=263.15) + self.visc_func.pre2*np.exp(self.visc_func.E2/(3.0*8.314*temp1))*(temp1>263.15))
-       Bdiff =  self.visc_func.pre_diff*np.exp(self.visc_func.E_diff/(8.314*temp1))
-       tau_y = self.visc_func.cohes(strain,Q).vector().get_local()
-       eta_visc = 0.5*(1./Bdiff + epsII**(2.0/3)/Bdisl)**(-1.0)
-       eta_plas = 0.5*tau_y/epsII
-       eta =  0.5*self.visc_func.visc_min/time_factor + (1.0/eta_visc + 2.0*epsII/tau_y + 2.0/(self.visc_func.visc_max/time_factor))**(-1.0)
-
-       self.epsII = epsII
-
-       # Save for debugging
-       self.eta =eta
-       self.eta_visc=eta_visc
-       self.eta_plas = eta_plas
-
-       # Make sure viscosity is never negative (interpolated viscosity can be negative!)
-       assert(np.min(eta_plas)>0.0)
-       assert(np.min(eta)>0.0)
-       assert(np.min(eta_visc)>0.0)
-       """
-
-       """
-
-       # Update plastic strains based on RK4 effective strain rates
-       if self.visc_func.plastic==True:
-           print('Interpolating eta_visc to nodes')
-           self.eta_visc_m= self.tracers.nodes_to_tracers(eta_visc)
-           print('Interpolating eta_plas to nodes')
-           self.eta_plas_m= self.tracers.nodes_to_tracers(eta_plas)
-
-       print('Interpolating eta to nodes')
-       self.eta_m= self.tracers.nodes_to_tracers(eta)
-       print('Interpolating epsII to nodes')
-       self.epsII_m = self.tracers.nodes_to_tracers(epsII)
-
-       # Now compute CFL criterion and take time step based on CFL
-       Q0 = FunctionSpace(self.mesh.mesh, "DG", 0)
-       time_step_CFL = 0.5*np.min(project(CellDiameter(self.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
-       dt = np.minimum(time_step_CFL,dt)
-       dt_step.assign(dt)
-
-       print('Time step CFL',dt)
-       solver.solve()
-       p, u = w.split(deepcopy=True)
-
-       ux,uz = u.split()
-       speed = np.sqrt(ux.compute_vertex_values()**2+uz.compute_vertex_values()**2)
-       print('Max total speed at actual time step',np.max(speed))
-
-       Q = self.mesh.Q      # Linear elements
-       ux = project(ux,Q).vector().get_local()
-       uz = project(uz,Q).vector().get_local()
-
-       if 'ux' and 'uz' in self.tracers.tracers.keys():
-           self.tracers.tracers['ux']=self.tracers.nodes_to_tracers(ux)
-           self.tracers.tracers['uz']=self.tracers.nodes_to_tracers(uz)
-       """
-
 
        return u,p
 
@@ -538,10 +462,7 @@ class Stokes2D:
        eta_plas = self.eta_plas
 
        Vdg = FunctionSpace(self.mesh.mesh, 'DG',1)
-       #Vcg = FunctionSpace(self.mesh.mesh, 'DG',1)
 
-       #W_e = FiniteElement("DG", self.mesh.mesh.ufl_cell(), 1)
-       #Vdg = FunctionSpace(self.mesh.mesh, W_e)
 
        # Variables to store strain and temp
        strain, temp = Function(Vdg), Function(Vdg)
@@ -551,65 +472,13 @@ class Stokes2D:
        lstsq_temp = l2projection(p, Vdg, 2) # First variable???
        lstsq_temp.project(temp,253.15,273.15) # Projection is stored in phih0
 
-       #yielded_nodes = eta_visc>eta_plas
-       #self.num_yielded = sum(yielded_nodes)*1.0/len(yielded_nodes)
-       # Make sure the time step satisfies the CFL criterion--maybe we should do this outside of the update???
        dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
        dt_m = np.minimum(dt,np.min(dt_min))
 
-       """
 
-       # Extract velocities at dofs
-       ux,uz = u.split()
-
-       ux = project(ux,Q).vector().get_local()
-       uz = project(uz,Q).vector().get_local()
-
-       # Interpolate velocities to current marker positions
-       ux1 = self.tracers.nodes_to_tracers(ux)
-       uz1 = self.tracers.nodes_to_tracers(uz)
-       """
-
-       # Should I interpolate the viscosities and strain rate to the marker?  Does it make a difference
-       #deps = conditional(eta_visc>eta_plas,1,0)*epsII*dt_m
-       #deps = epsII*dt_m
-
-
-       # Define binary variable yielded??
-
-       #deps_sol = Function(Vdg)
-       #local_project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vdg,deps_sol)
-       #"""
-
-
-
-       #local_project(strain + epsII*dt_m,Vdg,deps)
-
-       #local_project(epsII*dt_m,Vdg,deps)
-       #deps = project(strain + conditional(eta_visc>eta_plas,1,0)*epsII*dt_m,Vcg)
-       #"""
-
-       #deps_vals = deps_sol.vector().get_local()
-       #deps_vals = np.maximum(deps_vals,0.0)
-       #deps_sol.vector().set_local(deps_vals)
-       #deps = interpolate(deps,Vdg)
-       #self.deps = deps_sol
-
-       #deps = project(strain + epsII*dt_m,Vdg)
-
-       #deps_dt = epsII
-
-
-       #theta = 1
-       #step = 1
-       #deps_dt = project(deps_dt,Q)
-
-       #p.increment(deps,strain, [1,3], theta, step)
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
-       #p.interpolate(deps_sol,1)
 
-       #"""
        (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
            p. return_property(mesh , 1) ,
            p. return_property(mesh , 2),
@@ -621,38 +490,8 @@ class Stokes2D:
        self.pstrain = pstrain
 
        pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
-       #"""
-
-
-
-       # Get strain at particle level
-       #pstrain_new = p.get_property(1)
-       # Make sure strain at particle level is positive definite
        pstrain_new = np.maximum(pstrain_new,0.0)
        p.change_property(pstrain_new,1)
-
-       """
-       x1,z1 = self.tracers.get_coords() # Initial coordinates of tracers
-
-       marker_points_original = self.tracers.x
-       x1 = np.copy(marker_points_original[:,0])
-       z1 = np.copy(marker_points_original[:,1])
-
-       ux_eff = ux1
-       uz_eff = uz1
-
-       deps_eff = deps1
-       deps_m = deps_eff
-
-       # Update tracer positions
-       self.tracers.x[:,0]= x1 + ux_eff*dt_m
-       self.tracers.x[:,1]= z1 + uz_eff*dt_m
-       print('Finished updating tracer positions')
-       """
-       # Update plastic strains based on effective strain rates
-       #if self.visc_func.plastic==True:
-       #   self.tracers.tracers['Strain']+=deps_m*dt_m
-
 
        print('Starting to remesh')
        if remesh == True:
@@ -727,46 +566,7 @@ class Stokes2D:
        self.temp = temp
        self.epsII = epsII
 
-       """
-       self.tracers.update_tracer_interp_functions()
-       print('Updated tracer interpolation function')
-       node_vars = self.tracers.tracers_to_nodes()
-       print('Starting to remove and reseed')
-       self.tracers.remove_and_reseed(node_vars,0,length,self.mesh.surf_fun,self.mesh.bed_fun)
-       print('Updating tracer interpolation functions')
-       self.tracers.update_tracer_interp_functions()
-       print('Finished updating tracer interpolation functions')
-       """
-
-       """
-       if np.min(self.tracers.tracers_per_cell)==0:
-           new_mesh=self.mesh.remesh(max_length=self.mesh.length)
-           self.set_mesh(new_mesh)
-           length = self.mesh.length
-           self.tracers.set_mesh(self.mesh)
-           self.tracers.update_tracer_interp_functions()
-           node_vars = self.tracers.tracers_to_nodes()
-           self.tracers.remove_and_reseed(node_vars,0,length,self.mesh.surf_fun,self.mesh.bed_fun)
-           self.tracers.update_tracer_interp_functions()
-           #self.u_k = None
-           #self.u_k = interpolate(self.u_k,self.vector2)
-
-
-       print('Removing bad points')
-       xm,zm = self.tracers.get_coords()
-       idx=np.isnan(self.tracers.tracers['Strain'])
-       n = sum(idx)
-       if n>0:
-         for item in self.tracers.tracers.keys():
-             # Get x coordinates and z coordinates of mesh
-
-             xz=self.mesh.mesh.coordinates()
-             values = node_vars[item].compute_vertex_values()
-             not_nan = ~np.isnan(values)
-             interp_fun = interpND(xz[not_nan],values[not_nan])
-             interp_vals = interp_fun(xm[idx],zm[idx])
-             self.tracers.tracers[item][idx]=interp_vals
-       """
+     
 
        self.u_k = interpolate(self.u_k,self.vector2)
        ap = advect_rk3(p, self.vector2, u, "open")
@@ -813,7 +613,7 @@ class Stokes2D:
            GAMMA_3 = Right()
            GAMMA_3.mark(self.boundary_parts, 2)
 
-       # First trial step for RK3 method
+       # First trial step for RK4 method
        initial_coords = self.mesh.mesh.coordinates()
        x1 = np.copy(self.mesh.mesh.coordinates()[:,0])
        z1 = np.copy(self.mesh.mesh.coordinates()[:,1])
@@ -821,11 +621,7 @@ class Stokes2D:
        u1 = interpolate(vel, VectorFunctionSpace(self.mesh.mesh, "CG", self.degree))
        ux1,uz1=u1.split()
 
-
-
        # Effective velocity
-       #new_mesh = Mesh(self.mesh.mesh)
-
        Q = VectorFunctionSpace(self.mesh.mesh, "CG", self.degree) # Function Space
        uq = interpolate(vel,Q)
        uq.vector()[:]=u1.vector().get_local()
