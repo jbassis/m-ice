@@ -74,14 +74,13 @@ length= ice_thick*12
 water_depth = ice_thick*910.0/1020 - Hab
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333*2)
-dz = 80.0
+dz = round(ice_thick/13.333333333)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =  -0.01
+bed_slope =   0.01
 
 L = length+ice_thick*0
 bump_width = ice_thick
@@ -116,9 +115,9 @@ print('Time to make mesh and basis functions',time.time()-start)
 # Create particles defined on mesh
 #xm,zm = mesh.get_coords();xmin = np.min(xm); xmax=np.max(xm);ymin = np.min(zm); ymax=np.max(zm)
 #xp = RandomRectangle(Point(xmin, ymin), Point(xmax, ymax)).generate([Nx*10, Nz*10])
-p_min = 15
+tracers_per_cell = 4
 gen = RandomCell(mesh.mesh)
-xp = gen.generate(p_min)
+xp = gen.generate(tracers_per_cell)
 #_____________________________________________
 # Define function space for strain and temperature function
 Vdg = FunctionSpace(mesh.mesh, 'DG',1)
@@ -138,14 +137,13 @@ epsII_mesh.assign(strain_init)
 pstrain = assign_particle_values(xp, strain_fun)
 pepsII = assign_particle_values(xp, strain_fun)
 ptemp = assign_particle_values(xp, temp_fun)
-pyielded = assign_particle_values(xp, strain_fun)
-
 
 # Now we initialize the particle class
-p = particles(xp, [pstrain,ptemp,pepsII,pyielded], mesh.mesh)
+p = particles(xp, [pstrain,ptemp,pepsII], mesh.mesh)
 
 # Make sure we have enough particles per cell
-p_max = 40
+p_min = tracers_per_cell
+p_max = 12
 AD = AddDelete(p, p_min, p_max, [strain_mesh, temp_mesh,epsII_mesh]) # Sweep over mesh to delete/insert particles
 AD.do_sweep()
 
@@ -177,7 +175,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 0e3/material.secpera*material.time_factor
+left_vel = 1e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -215,11 +213,10 @@ t = 0.0
 it_type = 'Picard'
 
 max_length = 1.375*length# Regrid if length exceeds this value
-#dmax_length = 11.75e3
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_0.0_method5/'
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.01_flux_1.0/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -232,7 +229,7 @@ model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
 
-model.method = 4
+model.method = 6
 for i in range(i,100000):
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
@@ -285,11 +282,10 @@ for i in range(i,100000):
        if save_files == True:
            #uxm = particles.tracers['ux']
            #uzm = particles.tracers['uz']
-           (xp , pstrain , ptemp, pepsII,pyielded) = (p. return_property(mesh , 0) ,
+           (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
              p. return_property(mesh , 1) ,
              p. return_property(mesh , 2),
-             p. return_property(mesh , 3),
-             p. return_property(mesh , 4))
+             p. return_property(mesh , 3))
 
            #eta_visc_m = model.tracers.nodes_to_tracers(model.eta_visc)
            #eta_plas_m = model.tracers.nodes_to_tracers(model.eta_plas)
@@ -303,7 +299,7 @@ for i in range(i,100000):
            mesh_file = File(mesh_file_name)
            mesh_file << model.mesh.mesh
            temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
-           temp_file=HDF5File(mesh.mesh.mpi_comm(), temp_file_name, 'w')
+           temp_file=HDF5File(model.mesh.mesh.mpi_comm(), temp_file_name, 'w')
            temp_file.write(u,'u')
            temp_file.close()
 
@@ -331,13 +327,12 @@ for i in range(i,100000):
        (xp , pstrain , ptemp, pepsII,pyielded) = (p. return_property(mesh , 0) ,
           p. return_property(mesh , 1) ,
           p. return_property(mesh , 2),
-          p. return_property(mesh , 3),
-          p. return_property(mesh , 4))
+          p. return_property(mesh , 3))
        del p
        p = particles(xp, [pstrain,ptemp,pepsII,pyielded], model.mesh.mesh)
 
 
-   AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg),interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
+   AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
 
    xx=np.linspace(0,length*1.5,101)
