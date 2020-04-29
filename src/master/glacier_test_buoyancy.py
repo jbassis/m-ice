@@ -40,7 +40,7 @@ import pylab as plt
 import logging
 logging.getLogger('FFC').setLevel(logging.ERROR)
 logging.getLogger('UFL').setLevel(logging.ERROR)
-
+parameters['ghost_mode']='shared_facet'
 
 set_log_level(50)
 set_log_active(False)
@@ -74,13 +74,13 @@ length= ice_thick*12
 water_depth = ice_thick*910.0/1020 - Hab
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333)
+dz = round(ice_thick/13.333333333/2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =   0.01
+bed_slope =  -0.01
 
 L = length+ice_thick*0
 bump_width = ice_thick
@@ -174,7 +174,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 0e3/material.secpera*material.time_factor
+left_vel = 5e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -215,7 +215,7 @@ max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.01_flux_0.0/'
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_5.0_high_res/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -311,10 +311,7 @@ for i in range(i,100000):
    hr,day = np.modf(day)
    hr = round(hr*24,0)
    title_str = 'Time: '+str(yr).zfill(1)+ 'a '+str(int(day)).zfill(1)+'d '+str(int(hr)).zfill(1)+'hr'
-   (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
-   p. return_property(mesh , 1) ,
-   p. return_property(mesh , 2),
-   p. return_property(mesh , 3))
+
 
 
    if remesh_elastic == False:
@@ -328,9 +325,18 @@ for i in range(i,100000):
        del p
        p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
 
-
+   # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
+   ap = advect_rk3(p, model.vector2, model.u_k, "open")
+   ap.do_step(time_step)
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
+
+   # Plotting
+   (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+       p. return_property(mesh , 1) ,
+       p. return_property(mesh , 2),
+       p. return_property(mesh , 3))
+
 
    xx=np.linspace(0,length*1.5,101)
    xs=np.linspace(0,length,101)
@@ -338,8 +344,6 @@ for i in range(i,100000):
    plt.figure(1);plt.clf();
    ax1=plt.subplot(2,1,1);
    c=plt.scatter(xp[:,0],xp[:,1],s=0.1,c=np.log10(np.maximum(pstrain,1e-16)),vmin=-4,vmax=1);cbar1=plt.colorbar(c);
-   #plt.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
-   #plt.plot(xs,surf_fun(xs),'--',color='gray')
    cbar1.set_ticks([-4,1])
    plt.axis('equal')
    plt.title(title_str)

@@ -18,6 +18,7 @@ from leopart import (
     RandomRectangle,
     l2projection,
     advect_rk3,
+    advect_particles,
     assign_particle_values,
     AddDelete
 )
@@ -478,6 +479,7 @@ class Stokes2D:
 
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
+       self.epsII = epsII
 
        (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
            p. return_property(mesh , 1) ,
@@ -566,11 +568,11 @@ class Stokes2D:
        self.temp = temp
        self.epsII = epsII
 
-     
+
 
        self.u_k = interpolate(self.u_k,self.vector2)
-       ap = advect_rk3(p, self.vector2, u, "open")
-       ap.do_step(dt_m)
+       #ap = advect_rk3(p, self.vector2, u, "open")
+       #ap.do_step(dt_m)
        return dt_m
 
    def remesh_elastic(self,vel,dt):
