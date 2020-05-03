@@ -328,7 +328,7 @@ class Stokes2D:
        strain, temp = Function(Vdg), Function(Vcg)
 
        lstsq_temp = l2projection(p, Vcg, 2)
-       lstsq_temp.project(temp)
+       lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
 
        lstsq_strain = l2projection(p, Vdg, 1) # First variable???
        lstsq_strain.project_mpm(strain) # Projection is stored in phih0
@@ -471,7 +471,7 @@ class Stokes2D:
        lstsq_strain.project_mpm(strain) # Projection is stored in phih0
 
        lstsq_temp = l2projection(p, Vdg, 2) # First variable???
-       lstsq_temp.project(temp,253.15,273.15) # Projection is stored in phih0
+       lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
 
        dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
        dt_m = np.minimum(dt,np.min(dt_min))
