@@ -28,6 +28,7 @@ from leopart import (
     RandomRectangle,
     l2projection,
     advect_rk3,
+    advect_particles,
     assign_particle_values,
     AddDelete,
     RandomCell
@@ -74,7 +75,7 @@ length= ice_thick*12
 water_depth = ice_thick*910.0/1020 - Hab
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333/2)
+dz = round(ice_thick/13.333333333*2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
@@ -201,7 +202,7 @@ model.m = 1.0/3.0 # Friction exponent
 
 #_____________________________________________
 # Maximum time step
-time_step_secs = 86400.0  # Time step in seconds
+time_step_secs = 86400.0/3  # Time step in seconds
 time_step = time_step_secs/material.time_factor # Convert time step to unit we are using
 
 
@@ -214,8 +215,8 @@ it_type = 'Picard'
 max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
-save_files = True# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_5.0_high_res/'
+save_files = False# Set to True if we want to save output files
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_5.0_high_res_CFL_warm/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -223,7 +224,7 @@ if save_files==True:
 
 
 input_flux = left_vel*(surf_fun(0.0)-bot_fun(0.0)) # Define input flux at left edge of the domain
-CFL = 0.2
+CFL = 0.25
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
@@ -249,9 +250,9 @@ for i in range(i,100000):
    Q0 = FunctionSpace(model.mesh.mesh, "DG", 0)
    time_step_CFL = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
    print('Time step CFL',time_step_CFL)
-   #if time_step_CFL<0.5*time_step:
-    #   time_step=time_step_CFL
-     #  u,pres = model.solve(node_vars,dt=time_step,tolerance=model.tolerance);#model.u_k = None
+   #if time_step_CFL<time_step:
+   #   time_step=time_step_CFL
+   #  u,pres = model.solve(node_vars,dt=time_step,tolerance=model.tolerance);#model.u_k = None
    #xm,zm = particles.get_coords()
 
    #particles.tracers['Strain'][xm<1e3]=particles.tracers['Strain'][xm<1e3]/(1.0+time_step/tau)
@@ -326,7 +327,7 @@ for i in range(i,100000):
        p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
 
    # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
-   ap = advect_rk3(p, model.vector2, model.u_k, "open")
+   ap = advect_particles(p, model.vector2, model.u_k, "open")
    ap.do_step(time_step)
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
@@ -336,7 +337,6 @@ for i in range(i,100000):
        p. return_property(mesh , 1) ,
        p. return_property(mesh , 2),
        p. return_property(mesh , 3))
-
 
    xx=np.linspace(0,length*1.5,101)
    xs=np.linspace(0,length,101)
