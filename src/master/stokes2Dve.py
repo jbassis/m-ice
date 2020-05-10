@@ -493,7 +493,30 @@ class Stokes2D:
 
        pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
        pstrain_new = np.maximum(pstrain_new,0.0)
+       pstrain_new[xp[:,0]<3e3]=0.0
        p.change_property(pstrain_new,1)
+
+
+       # Update temperature field based on diffusivity
+       T0 = temp
+       Q = self.tempModel.Q
+       T = Function(Q)
+
+       # Test and trial functions
+       phi, v = TrialFunction(Q), TestFunction(Q)
+
+       BC_left = DirichletBC(Q, self.tempModel.incoming_temp, self.boundary_parts, 3)
+       BC_bottom = DirichletBC(Q, Constant(self.tempModel.Tb), self.boundary_parts, 1)
+       BC_water = DirichletBC(Q, Constant(self.tempModel.Tb), self.boundary_parts, 5)
+       bcs = [BC_bottom,BC_left,BC_water]
+
+       # Bilinear form
+       F = inner(phi,v)*dx -inner(T0,v)*dx + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(phi),grad(v))*dx \
+         + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(T0),grad(v))*dx
+       problem = LinearVariationalProblem(lhs(F),rhs(F), T, bcs)
+       solver = LinearVariationalSolver(problem)
+       solver.solve()
+       p.interpolate(T,2)
 
        print('Starting to remesh')
        if remesh == True:
