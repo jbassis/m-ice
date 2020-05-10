@@ -473,9 +473,9 @@ class Stokes2D:
        lstsq_temp = l2projection(p, Vdg, 2) # First variable???
        lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
 
-       dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
-       dt_m = np.minimum(dt,np.min(dt_min))
-
+       #dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
+       #dt_m = np.minimum(dt,np.min(dt_min))
+       dt_m = dt
 
        epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
@@ -606,6 +606,8 @@ class Stokes2D:
        Updated to use 4th order (in space) Runge-Kutta method
        """
 
+       """
+
        # Mark above water line as subdomain 2
        x,z = self.mesh.get_coords()
        left_wall = 0.0
@@ -671,7 +673,25 @@ class Stokes2D:
        q = interpolate(q,V)
        q.vector()[:] /= dt
        self.q = q
-       return q
+        """
+       # Mark left boundary as subdomain 3
+       left_wall = 0.0
+       class Left(SubDomain):
+         "Mark nodes along the left wall"
+         def inside(self, x_values, on_boundary):
+             "Defines boundaries of left subdomain."
+             return on_boundary and (x_values[0]-left_wall<100000000000*DOLFIN_EPS_LARGE)
+
+       GAMMA_2 = Left()
+       GAMMA_2.mark(self.boundary_parts, 2)
+
+
+       Vcg = VectorFunctionSpace(self.mesh.mesh, "CG", 1)
+       bc2 = DirichletBC(Vcg.sub(0), Constant(0.0), self.boundary_parts, 2)
+       umesh = project(vel * dt, Vcg)
+       bc2.apply(umesh.vector())
+       ALE.move(self.mesh.mesh, umesh)
+       return umesh
 
    def remesh(self,u,dt):
        Q = self.mesh.Q_CG
