@@ -521,29 +521,15 @@ class Stokes2D:
        print('Starting to remesh')
        if remesh == True:
            if remesh_elastic==False:
-               #Temp = self.temp_model.advect_diffuse(T0,u,dt,self.scalar,self.boundary_parts,self.mesh.mesh)
-               #self.Temp = Temp
                if self.calving_front == False:
-
                   # Update model mesh with new mesh
+
+                  # Need to update????
                   new_mesh=self.remesh(u,dt_m)
-                  u_eff = u
                   print('Finished remeshing')
                else:
                   # Update mesh coordinates to new coordinates
-                  u_elastic=self.remesh_elastic(u,dt_m)
-                  u_eff = u-u_elastic
-                  u_eff = project(u-u_elastic,self.vector2)
-                  #Temp = self.temp_model.advect_diffuse(T0,u-u_elastic,dt,self.scalar,self.boundary_parts,self.mesh.mesh)
-                  #self.Temp = Temp
-                  ux,uz=u_elastic.split()
-
-
-                  # Update mesh coordinates
-                  coords = self.mesh.mesh.coordinates()
-                  coords[:,0]=coords[:,0]+ux.compute_vertex_values()*dt_m
-                  coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt_m
-
+                  self.remesh_elastic(u,dt_m)
                   # And update bounding box tree
                   self.mesh.mesh.bounding_box_tree().build(self.mesh.mesh)
                   self.markBoundaries()
@@ -557,24 +543,14 @@ class Stokes2D:
                length = self.mesh.length
            else:
                #xm,zm = self.tracers.get_coords()
-               x,z = self.mesh.get_coords()
-               xmax = np.max(x)
-               u_elastic=self.remesh_elastic(u,dt_m)
-               u_eff = u-u_elastic
-               u_eff = project(u-u_elastic,self.vector2)
-               ux,uz=u_elastic.split()
+               self.remesh_elastic(u,dt_m)
 
-
-               # Update mesh coordinates
-               coords = self.mesh.mesh.coordinates()
-               coords[:,0]=coords[:,0]+ux.compute_vertex_values()*dt_m
-               coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt_m
 
                # And update bounding box tree
                self.mesh.mesh.bounding_box_tree().build(self.mesh.mesh)
                self.markBoundaries()
 
-               length = xmax*2.0
+               length = self.mesh.length
            #self.tracers.set_mesh(self.mesh)
        else:
            length = self.mesh.length
@@ -599,81 +575,6 @@ class Stokes2D:
        return dt_m
 
    def remesh_elastic(self,vel,dt):
-       """
-        Remesh by solving fictious elasticity problem
-            We will solve an elastic problem on the mesh with deformation defined by the displacement
-            associated with the velocity field along the boundaries
-       Updated to use 4th order (in space) Runge-Kutta method
-       """
-
-       """
-
-       # Mark above water line as subdomain 2
-       x,z = self.mesh.get_coords()
-       left_wall = 0.0
-       class boundary(SubDomain):
-           "Mark above water line as subdomain."
-           def inside(self, x_values, on_boundary):
-               "Defines boundaries of right side above water subdomain."
-               return on_boundary
-       GAMMA_1 = boundary()
-       GAMMA_1.mark(self.boundary_parts, 1)
-
-       # Mark left boundary as subdomain 3
-       class Left(SubDomain):
-          "Mark nodes along the left wall"
-          def inside(self, x_values, on_boundary):
-              "Defines boundaries of left subdomain."
-              return on_boundary and (x_values[0]-left_wall<100000000000*DOLFIN_EPS_LARGE)
-
-       GAMMA_2 = Left()
-       GAMMA_2.mark(self.boundary_parts, 2)
-
-       # Mark left boundary as subdomain 3
-       if self.calving_front==False:
-           right_wall = self.mesh.length
-           class Right(SubDomain):
-              "Mark nodes along the right wall"
-              def inside(self, x_values, on_boundary):
-                  "Defines boundaries of left subdomain."
-                  return on_boundary and (right_wall-x_values[0]<100000000000*DOLFIN_EPS_LARGE)
-           GAMMA_3 = Right()
-           GAMMA_3.mark(self.boundary_parts, 2)
-
-       # First trial step for RK4 method
-       initial_coords = self.mesh.mesh.coordinates()
-       x1 = np.copy(self.mesh.mesh.coordinates()[:,0])
-       z1 = np.copy(self.mesh.mesh.coordinates()[:,1])
-       Q = self.vector # Function Space
-       u1 = interpolate(vel, VectorFunctionSpace(self.mesh.mesh, "CG", self.degree))
-       ux1,uz1=u1.split()
-
-       # Effective velocity
-       Q = VectorFunctionSpace(self.mesh.mesh, "CG", self.degree) # Function Space
-       uq = interpolate(vel,Q)
-       uq.vector()[:]=u1.vector().get_local()
-
-       # Create Dirichlet boundary conditions that apply the displacement to the boundary nodes
-       # Velocity boundary condition to boundary nodes that are displaced
-       bc1 = DirichletBC(Q, uq, self.boundary_parts, 1)
-       bc2 = DirichletBC(Q.sub(0), Constant(0.0), self.boundary_parts, 2)
-       bc2.apply(uq.vector())
-
-
-       new_mesh = Mesh(self.mesh.mesh)
-       coords = new_mesh.coordinates()
-       ux,uz = uq.split(deepcopy=True)
-       coords[:,0]=coords[:,0]+ux.compute_vertex_values()*dt
-       coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt
-
-       bmesh  = BoundaryMesh(new_mesh, 'exterior')
-       new_mesh = Mesh(self.mesh.mesh)
-       q=ALE.move(new_mesh, bmesh)
-       V = VectorFunctionSpace(new_mesh, 'CG', 1)
-       q = interpolate(q,V)
-       q.vector()[:] /= dt
-       self.q = q
-        """
        # Mark left boundary as subdomain 3
        left_wall = 0.0
        class Left(SubDomain):
@@ -692,74 +593,3 @@ class Stokes2D:
        bc2.apply(umesh.vector())
        ALE.move(self.mesh.mesh, umesh)
        return umesh
-
-   def remesh(self,u,dt):
-       Q = self.mesh.Q_CG
-       ux,uz = u.split()
-       ux = project(ux,Q).vector().get_local()
-       uz = project(uz,Q).vector().get_local()
-
-
-       # To do this we create a function and then mark top,bot, left and right
-       boundary_dofs= Function(Q)
-       bcTop = DirichletBC(Q, 12, self.boundary_parts, 2)
-       bcBot = DirichletBC(Q, 14, self.boundary_parts, 5)
-       bcBed = DirichletBC(Q, 14, self.boundary_parts, 1)
-       bcTop.apply(boundary_dofs.vector())
-       bcBot.apply(boundary_dofs.vector())
-       bcBed.apply(boundary_dofs.vector())
-
-       # Extract coordinates corresponding to dofs
-       dof_coords = Q.tabulate_dof_coordinates().reshape((-1, 2));xdof=dof_coords[:,0];zdof=dof_coords[:,1]
-
-       # Save dof coordinates for debuggins and plotting
-       self.xdof = xdof
-       self.zdof = zdof
-
-       # Extract coordinates of bottom of mesh
-       bot_nodes = boundary_dofs.vector().get_local()==14
-       xbot=xdof[bot_nodes]
-       zbot=zdof[bot_nodes]
-
-       # Extract velocity components at bottom of the mesh
-       ux_bot = ux[bot_nodes]
-       uz_bot = uz[bot_nodes]
-
-       # Update bottom nodes
-       xbot+=ux_bot*dt
-       zbot+=uz_bot*dt
-
-       # Now update top nodes
-       # Extract coordinates of top of mesh
-       top_nodes = boundary_dofs.vector().get_local()==12
-       xtop=xdof[top_nodes]
-       ztop=zdof[top_nodes]
-
-       # Extract velocity components at top of the mesh
-       ux_top = ux[top_nodes]
-       uz_top = uz[top_nodes]
-
-       # Update top nodes
-       xtop+=ux_top*dt
-       ztop+=uz_top*dt
-
-       # Create interpolation function to define top and bottom of the ice
-       id1 = np.argsort(xbot)
-       id2 = np.argsort(xtop)
-       bot_fun= interp1d(xbot[id1],zbot[id1],fill_value="extrapolate")
-       surf_fun = interp1d(xtop[id2],ztop[id2],fill_value="extrapolate")
-
-       self.xtop = xtop[id2]
-       self.ztop = ztop[id2]
-       self.xbot = xbot[id1]
-       self.zbot = zbot[id1]
-
-
-       # Create a new mesh
-       bed_fun = self.mesh.bed_fun
-       Nx = self.mesh.Nx
-       Nz = self.mesh.Nz
-       length = self.mesh.length
-       new_mesh = gridModel.MeshModelPoly(surf_fun,bot_fun,bed_fun,Nx=Nx,Nz=Nz,length=length)
-
-       return new_mesh
