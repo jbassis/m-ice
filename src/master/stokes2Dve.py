@@ -434,6 +434,17 @@ class Stokes2D:
        self.eta_plas=self.visc_func.plastic_visc(epsII ,strain,Q)
        self.epsII = epsII
 
+
+       epsII = Function(Q) # Plastic viscosity
+       eps1 = Function(Q) # Plastic viscosity
+       eps2 = Function(Q) # Plastic viscosity
+       eps = epsilon(u)
+       local_project(eps[0,0],Q,eps1)
+       local_project(eps[0,1],Q,eps2)
+       epsII.vector()[:] = np.sqrt(eps1.vector().get_local()**2+eps2.vector().get_local()**2)
+       #local_project(sqrt(eps1**2 + eps2**2),Q,epsII)
+       self.epsII = epsII
+
        if count>=maxit:
            print("WARNING: MAXIMUM NUMBER OF ITERATIONS EXCEEDED")
        self.u_k = u_k
@@ -473,11 +484,11 @@ class Stokes2D:
        lstsq_temp = l2projection(p, Vdg, 2) # First variable???
        lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
 
-       #dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
-       #dt_m = np.minimum(dt,np.min(dt_min))
-       dt_m = dt
+       dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
+       dt_m = np.minimum(dt,np.min(dt_min))
+       #dt_m = dt
 
-       epsII = project(epsII,Vdg)
+       #epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
        self.epsII = epsII
 
@@ -493,7 +504,7 @@ class Stokes2D:
 
        pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
        pstrain_new = np.maximum(pstrain_new,0.0)
-       pstrain_new[xp[:,0]<3e3]=0.0
+       pstrain_new[xp[:,0]<1e3]=0.0
        p.change_property(pstrain_new,1)
 
 
