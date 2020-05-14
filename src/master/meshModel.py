@@ -13,6 +13,9 @@ import mesh_functions
 reload(mesh_functions)
 from mesh_functions import *
 
+import os
+import tempfile
+
 
 def meshGmsh(geometryArray, meshSize):
 
@@ -39,9 +42,27 @@ def meshGmsh(geometryArray, meshSize):
     #Call the appropriate function to make the mesh. This is called on the geometry class that all of the points, lines, line loops, and surfaces have been added to.
     mesh = pygmsh.generate_mesh(geom,verbose=False)
 
-    meshio.write("tmp.msh", mesh)
+    path1 = os.path.join(tempfile.mkdtemp(), '.msh')
+    path2 = os.path.join(tempfile.mkdtemp(), '.xdmf')
 
-    os.system("meshio-convert tmp.msh tmp.xdmf -p -z")
+    #meshio.write("tmp.msh", mesh)
+    meshio.write(path1, mesh)
+
+    mesh_command ="meshio-convert "+path1+" "+path2+" -p -z"
+    #os.system("meshio-convert tmp.msh tmp.xdmf -p -z")
+
+    os.system(mesh_command)
+
+    mesh = Mesh()
+    with XDMFFile(path2) as infile:
+        infile.read(mesh)
+    os.remove(path1)
+    os.remove(path2)
+
+    return mesh
+
+    # Remove temporary files
+
 
 class MeshModel(object):
     """
@@ -214,13 +235,13 @@ class MeshModelPoly(MeshModel):
 
             self.geometryArray = geometryArray
             # Mesh generation uses the radius so twice the mesh size
-            meshGmsh(geometryArray, dz*2)
+            new_mesh=meshGmsh(geometryArray, dz*2)
 
             #mesh = Mesh('tmp.xml')
-            mesh = Mesh()
-            with XDMFFile("tmp.xdmf") as infile:
-                infile.read(mesh)
-            self.mesh=mesh
+            #mesh = Mesh()
+            #with XDMFFile("tmp.xdmf") as infile:
+            #    infile.read(mesh)
+            self.mesh=new_mesh
             self.mesh.bounding_box_tree().build(self.mesh)
 
         def remesh(self,max_length = None):
@@ -260,13 +281,13 @@ class MeshModelPoly(MeshModel):
 
             pt_new = np.array(pt_new)
             # The characteristic length is the radius so twice the mesh size
-            meshGmsh(pt_new.transpose(),dz*2)
+            new_mesh = meshGmsh(pt_new.transpose(),dz*2)
 
 
-            mesh = Mesh()
-            with XDMFFile("tmp.xdmf") as infile:
-                infile.read(mesh)
-            self.mesh=mesh
+            #mesh = Mesh()
+            #with XDMFFile("tmp.xdmf") as infile:
+            #    infile.read(mesh)
+            self.mesh=new_mesh
             self.mesh.bounding_box_tree().build(self.mesh)
             self.generate_function_spaces()
             return self
