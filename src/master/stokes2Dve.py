@@ -104,7 +104,7 @@ class Stokes2D:
        self.sea_level = 0.0
 
        # Regularization to enforce no-penetration condition on grounded portion of the ice sheet
-       self.elastic_coeff_rock=1e6
+       self.elastic_coeff_rock=1e5
 
        # Left and right horizontal velocities set at, well, left and right boundaries of the domain
        # By default the vertical velocitity is no-slip
@@ -298,6 +298,14 @@ class Stokes2D:
        self.DS = Measure("ds")(subdomain_data=self.boundary_parts)
 
 
+       facet_marker = MeshFunction('size_t', self.mesh.mesh, 1)
+       facet_marker.set_all(2)
+       GAMMA_1.mark(facet_marker, 1)
+       self.facet_marker=facet_marker
+
+
+
+
    def solve(self,p,dt=3600,tolerance=1e-6,relax_param=1.0):
        """
        Picard iteration to solve system of equations
@@ -438,9 +446,11 @@ class Stokes2D:
        epsII = Function(Q) # Plastic viscosity
        eps1 = Function(Q) # Plastic viscosity
        eps2 = Function(Q) # Plastic viscosity
+       eps3 = Function(Q) # Plastic viscosity
        eps = epsilon(u)
        local_project(eps[0,0],Q,eps1)
        local_project(eps[0,1],Q,eps2)
+       local_project(eps[1,1],Q,eps3)
        epsII.vector()[:] = np.sqrt(eps1.vector().get_local()**2+eps2.vector().get_local()**2)
        #local_project(sqrt(eps1**2 + eps2**2),Q,epsII)
        self.epsII = epsII
@@ -484,9 +494,9 @@ class Stokes2D:
        lstsq_temp = l2projection(p, Vdg, 2) # First variable???
        lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
 
-       dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
-       dt_m = np.minimum(dt,np.min(dt_min))
-       #dt_m = dt
+       #dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
+       #dt_m = np.minimum(dt,np.min(dt_min))
+       dt_m = dt
 
        #epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
@@ -502,6 +512,11 @@ class Stokes2D:
        self.ptemp = ptemp
        self.pstrain = pstrain
 
+
+       #strain_new = Function(Vdg)
+       #strain_new.vector()[:] = self.visc_func.update(epsII.vector().get_local(),temp.vector().get_local(),strain.vector().get_local(),dt_m)
+       #p.interpolate(strain_new,1)
+       #pstrain_new = p. return_property(mesh , 1) + pstrain
        pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
        pstrain_new = np.maximum(pstrain_new,0.0)
        pstrain_new[xp[:,0]<1e3]=0.0
@@ -523,11 +538,22 @@ class Stokes2D:
 
        # Bilinear form
        F = inner(phi,v)*dx -inner(T0,v)*dx + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(phi),grad(v))*dx \
-         + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(T0),grad(v))*dx
+            + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(T0),grad(v))*dx
        problem = LinearVariationalProblem(lhs(F),rhs(F), T, bcs)
        solver = LinearVariationalSolver(problem)
        solver.solve()
        p.interpolate(T,2)
+
+
+       #facet_marker = MeshFunction('size_t', self.mesh.mesh, 1)
+       #facet_marker.set_all(0)
+
+
+       #ap = advect_particles(p, self.vector2, u,self.facet_marker)
+       ap = advect_particles(p, self.vector2, u,"open")
+       ap.do_step(dt_m)
+
+
 
        print('Starting to remesh')
        if remesh == True:
