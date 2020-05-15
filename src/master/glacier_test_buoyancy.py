@@ -213,10 +213,11 @@ t = 0.0
 it_type = 'Picard'
 
 max_length = 1.375*length# Regrid if length exceeds this value
+max_length = 12e3
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_5.0_high_res_CFL3/'
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_5.0_high_res_CFL4/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -326,13 +327,15 @@ for i in range(i,100000):
           p. return_property(mesh , 3))
        del p
        p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
-   #else:
-   #   p.relocate()
+
+   else:
+       p.relocate()
 
    # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
    #p.relocate()
-   #ap = advect_particles(p, model.vector2, model.u_k, "open")
-   #p.do_step(time_step)
+   ap = advect_particles(p, model.vector2, model.u_k, "open")
+   #ap = advect_particles(p, model.vector2, u,model.facet_marker)
+   ap.do_step(time_step*0.5)
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
 
@@ -388,5 +391,5 @@ for i in range(i,100000):
    print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')
-   if t>0.5:
+   if t>1.0:
        break

@@ -549,9 +549,9 @@ class Stokes2D:
        #facet_marker.set_all(0)
 
 
-       #ap = advect_particles(p, self.vector2, u,self.facet_marker)
-       ap = advect_particles(p, self.vector2, u,"open")
-       ap.do_step(dt_m)
+       ap = advect_particles(p, self.vector2, u,self.facet_marker)
+       #ap = advect_particles(p, self.vector2, u,"open")
+       ap.do_step(dt_m*0.5)
 
 
 
