@@ -43,7 +43,9 @@ def meshGmsh(geometryArray, meshSize):
     mesh = pygmsh.generate_mesh(geom,verbose=False)
 
     path1 = os.path.join(tempfile.mkdtemp(), '.msh')
+    path1 = tempfile.NamedTemporaryFile().name+'.msh'
     path2 = os.path.join(tempfile.mkdtemp(), '.xdmf')
+    path2 = tempfile.NamedTemporaryFile().name+'.xdmf'
 
     #meshio.write("tmp.msh", mesh)
     meshio.write(path1, mesh)
