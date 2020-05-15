@@ -14,80 +14,27 @@ height = width / 1.618
 height = width/7*2
 
 # Base directory for file
-#fname_base= 'data/tmp13/glacier_cliff_'
-#fname_base= 'data/prograde20_mid_res/glacier_cliff_'
-#fname_base= 'data/retrograde6_mid_res/glacier_cliff_'
-#fname_base= 'data/retrograde_test_old2/glacier_cliff_'
-
-fname_base = 'data/cliff/water_depth_688_low_res/glacier_cliff_'
-fname_base = 'data/cliff/water_depth_0_high_res/glacier_cliff_'
-fname_base = 'data/cliff/water_depth_0_high_res_slope/glacier_cliff_'
-fname_base = 'data/water_depth_0_high_res_low_visc/glacier_cliff_'
-#fname_base = 'data/cliff/water_depth_300_high_res/glacier_cliff_'
-fname_base = 'data/cliff/water_depth_0_high_res_slope_new/glacier_cliff_'
-#fname_base = 'data/cliff/water_depth_688_high_res_new6/glacier_cliff_'
-
-
-fname_base = 'data/cliff/water_depth_300_high_res_retro_steep_bed/glacier_cliff_'
-fname_base = 'data/cliff/water_depth_688_high_res_retro/glacier_cliff_'
-fname_base = 'data/cliff/15C/water_depth_306_high_res_flux_1.5_slope-0.01_min_visc/glacier_cliff_'
-fname_base = 'data/cliff/15C/water_depth_306_high_res_flux_1.5_slope-0.01/glacier_cliff_'
-fname_base = 'data/cliff/15C/water_depth_306_high_res_flux_2.0_slope-0.00_min_visc/glacier_cliff_'
-fname_base ='data/cliff/15C/water_depth_306_low_res_flux_0.0_slope-0.01/glacier_cliff_'
-fname_base ='data/cliff/15C/water_depth_306_low_res_flux_0.0_slope-0.0/glacier_cliff_'
-fname_base = 'data/cliff/15C/water_depth_306_high_res_flux_0.0_slope-0.0/glacier_cliff_'
-fname_base = 'data/cliff/flat/water_depth_306_high_res_flux_1.0_slope--0.01/glacier_cliff_'
-fname_base ='data/cliff/flat/water_depth_306_high_res_flux_2.0_slope--0.01/glacier_cliff_'
-#fname_base = 'data/cliff/water_depth_700/glacier_min_yield_20_surf_slope_0.02_med_visc_bed_slope_0.01_flux_2.0/glacier_cliff_'
-fname_base = 'data/cliff/water_depth_300/glacier_min_yield_20_surf_slope_0.02_med_visc_bed_slope_0.0_bump8/glacier_cliff_'
-
+fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_2.0_high_res/glacier_cliff_'
+fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_3.5_high_res_CFL/glacier_cliff_'
+fname_base ='../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_3.0_high_res_CFL/glacier_cliff_'
 fname_out = fname_base#+'junk'
-#fname_out = 'data/cliff/flat/water_depth_306_high_res_flux_0.0_slope-0.0_colder/glacier_cliff_'
 
-#fname_out = 'data/tmp14/glacier_cliff_'
 
-#12: 791
 # Specify file to load
-step = 1
-nmax = 4650
 
-# Geometric variables
-if fname_base[23]=='0':
-    ice_thick = 135.0
-    Hab = ice_thick
-elif fname_base[23]=='3':
-    ice_thick = 400.0
-    Hab = 65.0
-    Hab = 60.0
-else:
-    ice_thick = 800.0
-    Hab = 25.0
-
-
-length= ice_thick*12
-water_depth = ice_thick*910.0/1020 - Hab
-
-# Define surface, bottom, etc
-if fname_base[5:10] == 'retro':
-    surf_slope = 0.02
-    bed_slope = -0.01
-else:
-    surf_slope = 0.02
-    bed_slope =  0.01
 
 #surf_slope= 0.02
 
 
 
-ice_thick = 400.0
-Hab = 60.0
-Hab = 45.0
+#ice_thick = 400.0
+#Hab = 60.0
+#Hab = 45.0
 #ice_thick = 135.0
 #Hab = ice_thick
-#ice_thick = 800.0
-#Hab = 25.0
+ice_thick = 800.0
+Hab = 25.0
 length= ice_thick*12
-#length= ice_thick*5
 water_depth = ice_thick*910.0/1020 - Hab
 
 #dz = 60.0
@@ -97,14 +44,14 @@ Nz = int(ice_thick/dz)
 
 # Define surface, bottom, etc
 surf_slope =  0.02
-bed_slope =   0.01*0
+bed_slope =  -0.01
 
 notch_height = 200.0*0
 notch_length = 40.0
 notch_slope = notch_height/notch_length/2
 L = length+ice_thick*0
 bump_width = ice_thick
-bump_height =  0.25*ice_thick
+bump_height =  0.25*ice_thick*0
 
 def bot_fun(x):
    b = -water_depth + bed_slope*(length-x)
@@ -136,8 +83,9 @@ fig.subplots_adjust(left=-0.0, bottom=.07, right=0.92, top=.95)
 #plt.tick_params(axis='both', which='major', labelsize=20)
 
 #for step in xrange(8350,9040,10):
-for step in xrange(1640,1890,10):
-#for step in xrange(3070,3120,10):
+#for step in range(10420,10490,10):
+for step in range(0,540,10):
+
 
 
    #fname_base= 'data/tmp8/restart_glacier_cliff_'
@@ -151,7 +99,7 @@ for step in xrange(1640,1890,10):
 
    # Filename
    fname = fname_base+fname_ext
-   print fname
+   print(fname)
 
 
    # Load data
@@ -161,18 +109,13 @@ for step in xrange(1640,1890,10):
 
 
    # Triangulation and point coordinates
-   x=data['xm'];z=data['zm'];eta=data['eta'];eta_visc=data['eta_visc_m']
-   filter =(x< max_length) & (eta>0.0) & (eta_visc>0.0)
+   x=data['xm'];z=data['zm'];
+   filter =(x< max_length)
    x = x[filter];z=z[filter]
    strain = maximum(data['strain'],1e-16)[filter]
    epsII = data['epsII'][filter]
    t=data['t']
-   eta = data['eta'][filter]
-   eta_visc = data['eta_visc_m'][filter]
-   #xx=data['xx']
-   #hsurf=data['hsurf']
-   #hbot=data['hbot']
-   #width=data['width']
+
 
 
    # Make plot
@@ -180,8 +123,8 @@ for step in xrange(1640,1890,10):
    plt.subplot(2,1,1)
    #c=plt.scatter(x,z,s=pts_size,c=np.log10(epsII),vmin=-8,vmax=-5)
    c=plt.scatter(x,z,s=pts_size,c=np.log10(strain),vmin=-4,vmax=1)
-   plt.fill_between([1e3,max_length],0.0,bed_fun(0)-ice_thick/5,color='dodgerblue',alpha=0.33,zorder=0)
-   plt.fill_between(xx,bed_fun(xx),bed_fun(0)-ice_thick/5,color=[139/255.,115/255.,85/255.],alpha=1.0,zorder=1)
+   plt.fill_between([1e3,max_length],0.0,np.minimum(bed_fun(0),bed_fun(length))-ice_thick/5,color='dodgerblue',alpha=0.33,zorder=0)
+   plt.fill_between(xx,bed_fun(xx),np.minimum(bed_fun(0),bed_fun(length))-ice_thick/5,color=[139/255.,115/255.,85/255.],alpha=1.0,zorder=1)
    plt.plot(xs,hs,'--',color='Gray',linewidth=2)
    plt.plot([xs[-1],xs[-1]],[hs[-1],bed_fun(xs[-1])],'--',color='Gray',linewidth=2)
    ax=plt.gca()
@@ -203,12 +146,12 @@ for step in xrange(1640,1890,10):
 
 
 
-   text_str = str(int(ice_thick+surf_slope*length+4))+' m'
+   text_str = str(int(ice_thick+(surf_slope-bed_slope)*length))+' m'
    text_str2 = str(int(max_length))+' m'
 
-   ax.annotate ('', (-ice_thick/5, bed_fun(0.0)), (-ice_thick/5, bed_fun(0.0)+ice_thick+surf_slope*length+4), arrowprops={'arrowstyle':'<->','linewidth':2})
+   ax.annotate ('', (-ice_thick/5, bed_fun(0.0)), (-ice_thick/5, bed_fun(0.0)+ice_thick+(surf_slope-bed_slope)*length), arrowprops={'arrowstyle':'<->','linewidth':2})
    ax.annotate(
-       text_str, xy=(-ice_thick/5, 120), xycoords='data',
+       text_str, xy=(-ice_thick/5, bed_fun(0)+120), xycoords='data',
        xytext=(-15, 0), textcoords='offset points',rotation=90)
 
 
@@ -222,9 +165,9 @@ for step in xrange(1640,1890,10):
 
    plt.subplot(2,1,2)
 
-   c=plt.scatter(x,z,s=pts_size,c=np.log10(epsII),vmin=-8,vmax=-5)
-   plt.fill_between([1e3,max_length],0.0,bed_fun(0)-ice_thick/5,color='dodgerblue',alpha=0.33,zorder=0)
-   plt.fill_between(xx,bed_fun(xx),bed_fun(0)-ice_thick/5,color=[139/255.,115/255.,85/255.],alpha=1.0,zorder=1)
+   c=plt.scatter(x,z,s=pts_size,c=np.log10(np.maximum(epsII,1e-16)),vmin=-8,vmax=-5)
+   plt.fill_between([1e3,max_length],0.0,np.minimum(bed_fun(0),bed_fun(length))-ice_thick/5,color='dodgerblue',alpha=0.33,zorder=0)
+   plt.fill_between(xx,bed_fun(xx),np.minimum(bed_fun(0),bed_fun(length))-ice_thick/5,color=[139/255.,115/255.,85/255.],alpha=1.0,zorder=1)
    plt.plot(xs,hs,'--',color='Gray',linewidth=2)
    plt.plot([xs[-1],xs[-1]],[hs[-1],bed_fun(xs[-1])],'--',color='Gray',linewidth=2)
    ax=plt.gca()
@@ -242,14 +185,14 @@ for step in xrange(1640,1890,10):
    cbar3.set_ticklabels([r'$10^{-8}$',r'$10^{-5}$'])
    cbar3.set_label('$\dot \epsilon_{II}$ (s$^{-1}$)',fontsize=12)
 
-   ax.annotate ('', (-ice_thick/5, bed_fun(0.0)), (-ice_thick/5, bed_fun(0.0)+ice_thick+surf_slope*length+4), arrowprops={'arrowstyle':'<->','linewidth':2})
+   ax.annotate ('', (-ice_thick/5, bed_fun(0.0)), (-ice_thick/5, bed_fun(0.0)+ice_thick+(surf_slope-bed_slope)*length), arrowprops={'arrowstyle':'<->','linewidth':2})
    ax.annotate(
-      text_str, xy=(-ice_thick/5, 120), xycoords='data',
+      text_str, xy=(-ice_thick/5,  bed_fun(0)+120), xycoords='data',
       xytext=(-15, 0), textcoords='offset points',rotation=90)
 
-   ax.annotate ('', (0.0, bed_fun(0)-ice_thick/3), (int(max_length), bed_fun(0)-ice_thick/3), arrowprops={'arrowstyle':'<->','linewidth':2})
+   ax.annotate ('', (0.0, np.minimum(bed_fun(0),bed_fun(length))-ice_thick/3), (int(max_length), np.minimum(bed_fun(0),bed_fun(length))-ice_thick/3), arrowprops={'arrowstyle':'<->','linewidth':2})
    ax.annotate(
-    text_str2, xy=(max_length/2, bed_fun(0)-ice_thick/3), xycoords='data',
+    text_str2, xy=(max_length/2, np.minimum(bed_fun(0),bed_fun(length))-ice_thick/3), xycoords='data',
     xytext=(0, -10), textcoords='offset points')
 
    plt.subplots_adjust(wspace=0, hspace=0)
