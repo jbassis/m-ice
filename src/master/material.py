@@ -91,7 +91,7 @@ class glenFlow(object):
 
         eta_visc = self.ductile_visc(epsII,temp,functionSpace=None)
         eta_plas = self.plastic_visc(epsII,strain,functionSpace=None)
-        strain_new = strain + (eta_visc>eta_plas)*epsII*dt
+        strain_new = strain + (eta_visc>eta_plas)*np.maximum(epsII,0.0)*dt
         return strain_new
 
 
