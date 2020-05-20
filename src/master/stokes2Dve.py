@@ -340,6 +340,8 @@ class Stokes2D:
 
        lstsq_strain = l2projection(p, Vdg, 1) # First variable???
        lstsq_strain.project_mpm(strain) # Projection is stored in phih0
+       #lstsq_strain.project(strain,0,10) # Projection is stored in phih0
+
 
 
 
@@ -490,7 +492,7 @@ class Stokes2D:
        strain, temp = Function(Vdg), Function(Vdg)
        lstsq_strain = l2projection(p, Vdg, 1) # First variable???
        lstsq_strain.project_mpm(strain) # Projection is stored in phih0
-
+       #lstsq_strain.project(strain,0,10) #
        lstsq_temp = l2projection(p, Vdg, 2) # First variable???
        lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
 
@@ -549,9 +551,9 @@ class Stokes2D:
        #facet_marker.set_all(0)
 
 
-       ap = advect_particles(p, self.vector2, u,self.facet_marker)
+       #ap = advect_particles(p, self.vector2, u,self.facet_marker)
        #ap = advect_particles(p, self.vector2, u,"open")
-       ap.do_step(dt_m*0.5)
+       #ap.do_step(dt_m*0.5)
 
 
 
