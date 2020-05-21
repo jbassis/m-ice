@@ -28,7 +28,6 @@ from leopart import (
     RandomRectangle,
     l2projection,
     advect_rk3,
-    advect_particles,
     assign_particle_values,
     AddDelete,
     RandomCell
@@ -175,7 +174,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 3e3/material.secpera*material.time_factor
+left_vel = 0e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -185,7 +184,7 @@ model.tempModel=Tmodel
 model.tolerance = 1e-5
 model.u_k = None
 model.maxit = 25
-model.maxit_local = 100
+model.maxit_local = 25
 model.local_err_min = 1.0
 model.tracers = particles
 
@@ -202,7 +201,7 @@ model.m = 1.0/3.0 # Friction exponent
 
 #_____________________________________________
 # Maximum time step
-time_step_secs = 86400.0/8  # Time step in seconds
+time_step_secs = 86400.0/64
 time_step = time_step_secs/material.time_factor # Convert time step to unit we are using
 
 
@@ -213,11 +212,11 @@ t = 0.0
 it_type = 'Picard'
 
 max_length = 1.375*length# Regrid if length exceeds this value
-max_length = 12e3
+max_length = 12e3# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
-save_files = True# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_5.0_high_res_CFL4/'
+save_files = False# Set to True if we want to save output files
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_0.0_high_res_CFL3/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -229,7 +228,13 @@ CFL = 0.5
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
-for i in range(i,100000):
+
+L2_strain = []
+tlist =[]
+model.strain = Function(model.mesh.Q)
+for i in range(i,1000000):
+   L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
+   tlist.append(t)
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
 
@@ -241,20 +246,20 @@ for i in range(i,100000):
        quality=np.min(MeshQuality.radius_ratios(model.mesh.mesh).array())
        time_step = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
        time_step = np.minimum(time_step_secs/material.time_factor,time_step)
-   #time_step = time_step_secs/material.time_factor
 
 
    print('Time step',time_step)
    u,pres = model.solve(p,dt=time_step,tolerance=model.tolerance)
+   print('L2 norm of epsII',assemble(model.epsII*dx(model.mesh.mesh))/1e5)
 
    # Do a little bit of accounting to make sure that our time step doesn't violate the CFL criterion
    ux, uz = model.get_velocity();speed = np.sqrt(ux**2+uz**2)
    Q0 = FunctionSpace(model.mesh.mesh, "DG", 0)
-   #time_step_CFL = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
-   #print('Time step CFL',time_step_CFL)
-   #if time_step_CFL<time_step:
-   #   time_step=time_step_CFL
-   #  u,pres = model.solve(node_vars,dt=time_step,tolerance=model.tolerance);#model.u_k = None
+   time_step_CFL = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
+   print('Time step CFL',time_step_CFL)
+   #if time_step_CFL<0.5*time_step:
+    #   time_step=time_step_CFL
+     #  u,pres = model.solve(node_vars,dt=time_step,tolerance=model.tolerance);#model.u_k = None
    #xm,zm = particles.get_coords()
 
    #particles.tracers['Strain'][xm<1e3]=particles.tracers['Strain'][xm<1e3]/(1.0+time_step/tau)
@@ -327,15 +332,12 @@ for i in range(i,100000):
           p. return_property(mesh , 3))
        del p
        p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
-
    else:
-       p.relocate()
+        p.relocate()
 
    # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
-   #p.relocate()
-   ap = advect_particles(p, model.vector2, model.u_k, "open")
-   #ap = advect_particles(p, model.vector2, u,model.facet_marker)
-   ap.do_step(time_step*0.5)
+   ap = advect_rk3(p, model.vector2, model.u_k, "open")
+   ap.do_step(time_step)
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
 
@@ -344,6 +346,7 @@ for i in range(i,100000):
        p. return_property(mesh , 1) ,
        p. return_property(mesh , 2),
        p. return_property(mesh , 3))
+
 
    xx=np.linspace(0,length*1.5,101)
    xs=np.linspace(0,length,101)
@@ -386,10 +389,10 @@ for i in range(i,100000):
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
    # Print some diagnostics to screen for debugging purpose
-   t = t+time_step
    print('*******************************************')
    print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
-   print(np.max(u.compute_vertex_values()))
+   t = t+time_step
    print('*******************************************')
-   if t>1.0:
+
+   if t>= 0.025:
        break
