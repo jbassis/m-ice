@@ -104,7 +104,7 @@ class Stokes2D:
        self.sea_level = 0.0
 
        # Regularization to enforce no-penetration condition on grounded portion of the ice sheet
-       self.elastic_coeff_rock=1e5
+       self.elastic_coeff_rock=1e6
 
        # Left and right horizontal velocities set at, well, left and right boundaries of the domain
        # By default the vertical velocitity is no-slip
@@ -436,7 +436,7 @@ class Stokes2D:
 
        ux,uz = u.split()
        speed = np.sqrt(ux.compute_vertex_values()**2+uz.compute_vertex_values()**2)
-       print('Max viscous speed',np.max(speed))
+       #print('Max viscous speed',np.max(speed))
        epsII=self.effective_strain_rate_squared(u,Q)
 
        self.eta=self.visc_func(epsII ,temp,strain,Q)
@@ -523,6 +523,11 @@ class Stokes2D:
        pstrain_new = np.maximum(pstrain_new,0.0)
        pstrain_new[xp[:,0]<1e3]=0.0
        p.change_property(pstrain_new,1)
+
+       strain = Function(Vdg)
+       lstsq_strain = l2projection(p, Vdg, 1) # First variable???
+       lstsq_strain.project_mpm(strain) # Projection is stored in phih0
+       #self.strain = strain
 
 
        # Update temperature field based on diffusivity
@@ -625,10 +630,20 @@ class Stokes2D:
        GAMMA_2 = Left()
        GAMMA_2.mark(self.boundary_parts, 2)
 
-
+      #"""
        Vcg = VectorFunctionSpace(self.mesh.mesh, "CG", 1)
        bc2 = DirichletBC(Vcg.sub(0), Constant(0.0), self.boundary_parts, 2)
        umesh = project(vel * dt, Vcg)
        bc2.apply(umesh.vector())
-       ALE.move(self.mesh.mesh, umesh)
+       #ALE.move(self.mesh.mesh, umesh)
+       #"""
+       #"""
+       bmesh  = BoundaryMesh(self.mesh.mesh, 'exterior')
+       V = VectorFunctionSpace(bmesh, 'CG', 1)
+       u_boundary = interpolate(umesh,V)
+       ALE.move(bmesh,u_boundary)
+       ALE.move(self.mesh.mesh,bmesh)
+       # """
+
+
        return umesh
