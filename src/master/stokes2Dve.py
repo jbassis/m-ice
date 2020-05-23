@@ -541,13 +541,7 @@ class Stokes2D:
                    deps_dt_old = interpolate(self.deps_dt,Vdg)
                    deps_dt_older = interpolate(self.deps_dt_old,Vdg)
                    deps_dt_oldist = interpolate(self.deps_dt_older,Vdg)
-                   # Try adaptive time stepping
-                   #deps_dt_eff3.vector()[:]=23./12*deps_dt.vector().get_local()-16./12*deps_dt_old.vector().get_local()+5./12*deps_dt_older.vector().get_local()
-                   #deps_dt_eff4.vector()[:]=55./24*deps_dt.vector().get_local()-59./24*deps_dt_old.vector().get_local()+37./24*deps_dt_older.vector().get_local() -9./24*deps_dt_oldist.vector().get_local()
-                   #print('Maximum difference',np.max(deps4-deps3)*dt_m)
-                   #deps_dt_eff3.vector()[:]=(23./12*deps_dt.vector().get_local()-16./12*deps_dt_old.vector().get_local()+5./12*deps_dt_older.vector().get_local())/dt_m
                    deps_dt_eff.vector()[:]=(55./24*deps_dt.vector().get_local()-59./24*deps_dt_old.vector().get_local()+37./24*deps_dt_older.vector().get_local() -9./24*deps_dt_oldist.vector().get_local())
-                   #delta_eps = deps_dt_eff4-deps_dt_eff3
                    p.interpolate(deps_dt_eff,1)
                    self.deps_dt = deps_dt
                    self.deps_dt_old = deps_dt_old
