@@ -651,7 +651,46 @@ class Stokes2D:
        #ap = advect_rk3(p, self.vector2, u, "open")
        #ap.do_step(dt_m)
        return dt_m
+   def remesh_elastic_old(self,vel,dt):
+       left_wall = 0.0
+       # Mark left boundary as subdomain 3
+       class Left(SubDomain):
+          "Mark nodes along the left wall"
+          def inside(self, x_values, on_boundary):
+              "Defines boundaries of left subdomain."
+              return on_boundary and (x_values[0]-left_wall<100000000000*DOLFIN_EPS_LARGE)
 
+       GAMMA_2 = Left()
+       GAMMA_2.mark(self.boundary_parts, 2)
+
+       # Mark left boundary as subdomain 3
+       if self.calving_front==False:
+           right_wall = self.mesh.length
+           class Right(SubDomain):
+              "Mark nodes along the left wall"
+              def inside(self, x_values, on_boundary):
+                  "Defines boundaries of left subdomain."
+                  return on_boundary and (right_wall-x_values[0]<100000000000*DOLFIN_EPS_LARGE)
+           GAMMA_3 = Right()
+           GAMMA_3.mark(self.boundary_parts, 2)
+
+
+       Q = VectorFunctionSpace(self.mesh.mesh, "CG", 1) # Function Space
+       uq = interpolate(vel,Q)
+       bc2 = DirichletBC(Q.sub(0), Constant(0.0), self.boundary_parts, 2)
+       bc2.apply(uq.vector())
+
+       # Create new mesh
+       new_mesh = Mesh(self.mesh.mesh)
+       coords = new_mesh.coordinates()
+       ux,uz = uq.split(deepcopy=True)
+       coords[:,0]=coords[:,0]+ux.compute_vertex_values()*dt
+       coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt
+
+       bmesh  = BoundaryMesh(new_mesh, 'exterior')
+       del new_mesh
+       q=ALE.move(model.mesh.mesh, bmesh)
+       return q
    def remesh_elastic(self,vel,dt):
        # Mark left wall
        left_wall = 0.0
