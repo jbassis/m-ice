@@ -74,13 +74,13 @@ length= ice_thick*12
 water_depth = ice_thick*910.0/1020 - Hab
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333)
+dz = round(ice_thick/13.333333333/2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =  -0.01
+bed_slope =   0.01
 
 L = length+ice_thick*0
 bump_width = ice_thick
@@ -117,6 +117,9 @@ print('Time to make mesh and basis functions',time.time()-start)
 #xp = RandomRectangle(Point(xmin, ymin), Point(xmax, ymax)).generate([Nx*10, Nz*10])
 p_min = 8
 p_max = 16
+
+#p_min = 16
+#p_max = 32
 gen = RandomCell(mesh.mesh)
 xp = gen.generate(p_min)
 #_____________________________________________
@@ -174,7 +177,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 0e3/material.secpera*material.time_factor
+left_vel = 2e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -201,7 +204,7 @@ model.m = 1.0/3.0 # Friction exponent
 
 #_____________________________________________
 # Maximum time step
-time_step_secs = 86400.0/64
+time_step_secs = 86400.0/16*2# Time step in seconds
 time_step = time_step_secs/material.time_factor # Convert time step to unit we are using
 
 
@@ -212,11 +215,10 @@ t = 0.0
 it_type = 'Picard'
 
 max_length = 1.375*length# Regrid if length exceeds this value
-max_length = 12e3# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
-save_files = False# Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_0.0_high_res_CFL3/'
+save_files = True # Set to True if we want to save output files
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.01_flux_2.0_high_res_CFL/'
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -224,16 +226,21 @@ if save_files==True:
 
 
 input_flux = left_vel*(surf_fun(0.0)-bot_fun(0.0)) # Define input flux at left edge of the domain
-CFL = 0.5
+CFL = 0.2
+CFL = 1.0
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
 i =0
-
-L2_strain = []
-tlist =[]
 model.strain = Function(model.mesh.Q)
-for i in range(i,1000000):
-   L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
+L2_strain = []
+tlist = []
+model.deps_dt = None
+model.deps_dt_old = None
+model.deps_dt_older = None
+model.method = 1
+for i in range(i,100000):
+   L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
+   #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
    tlist.append(t)
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
@@ -250,7 +257,6 @@ for i in range(i,1000000):
 
    print('Time step',time_step)
    u,pres = model.solve(p,dt=time_step,tolerance=model.tolerance)
-   print('L2 norm of epsII',assemble(model.epsII*dx(model.mesh.mesh))/1e5)
 
    # Do a little bit of accounting to make sure that our time step doesn't violate the CFL criterion
    ux, uz = model.get_velocity();speed = np.sqrt(ux**2+uz**2)
@@ -333,7 +339,7 @@ for i in range(i,1000000):
        del p
        p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
    else:
-        p.relocate()
+       p.relocate()
 
    # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
    ap = advect_rk3(p, model.vector2, model.u_k, "open")
@@ -346,6 +352,8 @@ for i in range(i,1000000):
        p. return_property(mesh , 1) ,
        p. return_property(mesh , 2),
        p. return_property(mesh , 3))
+   pstrain[xp[:,0]<3e3]=0.0
+   p.change_property(pstrain,1)
 
 
    xx=np.linspace(0,length*1.5,101)
@@ -389,10 +397,15 @@ for i in range(i,1000000):
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
 
    # Print some diagnostics to screen for debugging purpose
-   print('*******************************************')
-   print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    t = t+time_step
    print('*******************************************')
+   print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
+   print(np.max(u.compute_vertex_values()))
+   print('*******************************************')
 
-   if t>= 0.025:
-       break
+
+#if model.method==1:
+#    plt.figure(4);plt.plot(tlist,L2_strain,label=time_step_secs)
+#else:
+#    plt.figure(4);plt.plot(tlist,L2_strain,'--',label=time_step_secs)
+#plt.legend()
