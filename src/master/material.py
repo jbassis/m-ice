@@ -43,6 +43,7 @@ class glenFlow(object):
         # If no function space is provided then these are just raw nparrays
         if functionSpace == None:
             temp = tempFun
+            epsII = np.maximum(epsII,0.0)
             Bdiff =  self.pre_diff*np.exp(self.E_diff/(8.314*temp))
             Bdisl = (self.pre1*np.exp(self.E1/(3.0*8.314*temp))*(temp<=263.15) + self.pre2*np.exp(self.E2/(3.0*8.314*temp))*(temp>263.15))
             visc = 0.5*(epsII**(2.0/3.0)/Bdisl + 1.0/Bdiff)**(-1.0)
@@ -94,6 +95,13 @@ class glenFlow(object):
         strain_new = strain + (eta_visc>eta_plas)*np.maximum(epsII,0.0)*dt
         return strain_new
 
+    def strain_update(self,epsII,temp,strain,dt):
+        """ Needs to be called at the particle level """
+
+        eta_visc = self.ductile_visc(epsII,temp,functionSpace=None)
+        eta_plas = self.plastic_visc(epsII,strain,functionSpace=None)
+        deps =  (eta_visc>eta_plas)*np.maximum(epsII,0.0)*dt
+        return deps
 
     def __call__(self,epsII,temp,strain,functionSpace=None):
         """

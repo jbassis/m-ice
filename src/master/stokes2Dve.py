@@ -298,14 +298,6 @@ class Stokes2D:
        self.DS = Measure("ds")(subdomain_data=self.boundary_parts)
 
 
-       facet_marker = MeshFunction('size_t', self.mesh.mesh, 1)
-       facet_marker.set_all(2)
-       GAMMA_1.mark(facet_marker, 1)
-       self.facet_marker=facet_marker
-
-
-
-
    def solve(self,p,dt=3600,tolerance=1e-6,relax_param=1.0):
        """
        Picard iteration to solve system of equations
@@ -336,12 +328,10 @@ class Stokes2D:
        strain, temp = Function(Vdg), Function(Vcg)
 
        lstsq_temp = l2projection(p, Vcg, 2)
-       lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
+       lstsq_temp.project(temp)
 
        lstsq_strain = l2projection(p, Vdg, 1) # First variable???
        lstsq_strain.project_mpm(strain) # Projection is stored in phih0
-       #lstsq_strain.project(strain,0,10) # Projection is stored in phih0
-
 
 
 
@@ -436,26 +426,25 @@ class Stokes2D:
 
        ux,uz = u.split()
        speed = np.sqrt(ux.compute_vertex_values()**2+uz.compute_vertex_values()**2)
-       #print('Max viscous speed',np.max(speed))
+       print('Max viscous speed',np.max(speed))
        epsII=self.effective_strain_rate_squared(u,Q)
 
        self.eta=self.visc_func(epsII ,temp,strain,Q)
        self.eta_visc=self.visc_func.ductile_visc(epsII ,temp,Q)
        self.eta_plas=self.visc_func.plastic_visc(epsII ,strain,Q)
-       self.epsII = epsII
+       #self.epsII = epsII
 
-
+       Q = Vdg
        epsII = Function(Q) # Plastic viscosity
        eps1 = Function(Q) # Plastic viscosity
        eps2 = Function(Q) # Plastic viscosity
-       eps3 = Function(Q) # Plastic viscosity
        eps = epsilon(u)
        local_project(eps[0,0],Q,eps1)
        local_project(eps[0,1],Q,eps2)
-       local_project(eps[1,1],Q,eps3)
        epsII.vector()[:] = np.sqrt(eps1.vector().get_local()**2+eps2.vector().get_local()**2)
        #local_project(sqrt(eps1**2 + eps2**2),Q,epsII)
        self.epsII = epsII
+
 
        if count>=maxit:
            print("WARNING: MAXIMUM NUMBER OF ITERATIONS EXCEEDED")
@@ -490,15 +479,15 @@ class Stokes2D:
 
        # Variables to store strain and temp
        strain, temp = Function(Vdg), Function(Vdg)
-       lstsq_strain = l2projection(p, Vdg, 1) # First variable???
-       lstsq_strain.project_mpm(strain) # Projection is stored in phih0
-       #lstsq_strain.project(strain,0,10) #
-       lstsq_temp = l2projection(p, Vdg, 2) # First variable???
-       lstsq_temp.project(temp,self.tempModel.Ts,self.tempModel.Tb)
+       #lstsq_strain = l2projection(p, Vdg, 1) # First variable???
+       #lstsq_strain.project_mpm(strain) # Projection is stored in phih0
 
-       #dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
-       #dt_m = np.minimum(dt,np.min(dt_min))
-       dt_m = dt
+       lstsq_temp = l2projection(p, Vdg, 2) # First variable???
+       lstsq_temp.project(temp,253.15,273.15) # Projection is stored in phih0
+
+       dt_min = 0.5*project(CellDiameter(self.mesh.mesh)/sqrt(dot(u, u)),Q0).compute_vertex_values()
+       dt_m = np.minimum(dt,np.min(dt_min))
+
 
        #epsII = project(epsII,Vdg)
        p.interpolate(epsII,3)
@@ -510,50 +499,52 @@ class Stokes2D:
            p. return_property(mesh , 3))
        pepsII = np.maximum(pepsII,0.0)
 
+
        self.pepsII = pepsII
        self.ptemp = ptemp
        self.pstrain = pstrain
+       #"""
+       if self.method==1:
 
+           deps_dt = Function(Vdg)
+           deps_dt.vector()[:] = self.visc_func.strain_update(epsII.vector().get_local(),temp.vector().get_local(),strain.vector().get_local(),dt_m)
+           deps_dt_eff = Function(Vdg)
+           #if self.deps_dt == None:
+           p.interpolate(deps_dt,1)
+           pstrain_new = np.maximum(p. return_property(mesh , 1) + pstrain,0.0)
+            #self.deps_dt = deps_dt
 
-       deps_dt = Function(Vdg)
-       deps_dt.vector()[:] = self.visc_func.strain_update(epsII.vector().get_local(),temp.vector().get_local(),strain.vector().get_local(),dt_m)
-       deps_dt_eff = Function(Vdg)
-       if self.deps_dt == None:
-            p.interpolate(deps_dt,1)
-            self.deps_dt = deps_dt
+       # else:
+       #     if self.deps_dt_old == None:
+       #         deps_dt_old = interpolate(self.deps_dt,Vdg)
+       #         deps_dt_eff.vector()[:]=1.5*deps_dt.vector().get_local()-0.5*deps_dt_old.vector().get_local()
+       #         p.interpolate(deps_dt_eff,1)
+       #         self.deps_dt = deps_dt
+       #
+       #         self.deps_dt_old = deps_dt_old
+       #     else:
+       #         if self.deps_dt_older==None:
+       #             deps_dt_older = interpolate(self.deps_dt_old,Vdg)
+       #             deps_dt_old = interpolate(self.deps_dt,Vdg)
+       #             deps_dt_eff.vector()[:]=23./12*deps_dt.vector().get_local()-16./12*deps_dt_old.vector().get_local()+5./12*deps_dt_older.vector().get_local()
+       #             p.interpolate(deps_dt_eff,1)
+       #             self.deps_dt = deps_dt
+       #             self.deps_dt_old = deps_dt_old
+       #             self.deps_dt_older = deps_dt_older
+       #         else:
+       #             deps_dt_old = interpolate(self.deps_dt,Vdg)
+       #             deps_dt_older = interpolate(self.deps_dt_old,Vdg)
+       #             deps_dt_oldist = interpolate(self.deps_dt_older,Vdg)
+       #             deps_dt_eff.vector()[:]=(55./24*deps_dt.vector().get_local()-59./24*deps_dt_old.vector().get_local()+37./24*deps_dt_older.vector().get_local() -9./24*deps_dt_oldist.vector().get_local())
+       #             p.interpolate(deps_dt_eff,1)
+       #             self.deps_dt = deps_dt
+       #             self.deps_dt_old = deps_dt_old
+       #             self.deps_dt_older = deps_dt_older
+
        else:
-           if self.deps_dt_old == None:
-               deps_dt_old = interpolate(self.deps_dt,Vdg)
-               deps_dt_eff.vector()[:]=1.5*deps_dt.vector().get_local()-0.5*deps_dt_old.vector().get_local()
-               p.interpolate(deps_dt_eff,1)
-               self.deps_dt = deps_dt
-               self.deps_dt_old = deps_dt_old
-           else:
-               if self.deps_dt_older==None:
-                   deps_dt_older = interpolate(self.deps_dt_old,Vdg)
-                   deps_dt_old = interpolate(self.deps_dt,Vdg)
-                   deps_dt_eff.vector()[:]=23./12*deps_dt.vector().get_local()-16./12*deps_dt_old.vector().get_local()+5./12*deps_dt_older.vector().get_local()
-                   p.interpolate(deps_dt_eff,1)
-                   self.deps_dt = deps_dt
-                   self.deps_dt_old = deps_dt_old
-                   self.deps_dt_older = deps_dt_older
-               else:
-                   deps_dt_old = interpolate(self.deps_dt,Vdg)
-                   deps_dt_older = interpolate(self.deps_dt_old,Vdg)
-                   deps_dt_oldist = interpolate(self.deps_dt_older,Vdg)
-                   deps_dt_eff.vector()[:]=(55./24*deps_dt.vector().get_local()-59./24*deps_dt_old.vector().get_local()+37./24*deps_dt_older.vector().get_local() -9./24*deps_dt_oldist.vector().get_local())
-                   p.interpolate(deps_dt_eff,1)
-                   self.deps_dt = deps_dt
-                   self.deps_dt_old = deps_dt_old
-                   self.deps_dt_older = deps_dt_older
+           pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
+           pstrain_new = np.maximum(pstrain_new,0.0)
 
-       pstrain_new = np.maximum(p. return_property(mesh , 1) + pstrain,0.0)
-       #pstrain_new = np.maximum(p. return_property(mesh , 1) + pstrain,0.0)
-
-       #"""
-       #pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
-       #pstrain_new = np.maximum(pstrain_new,0.0)
-       #"""
        pstrain_new[xp[:,0]<1e3]=0.0
        p.change_property(pstrain_new,1)
 
@@ -564,50 +555,32 @@ class Stokes2D:
        #self.strain = strain
 
 
-       # Update temperature field based on diffusivity
-       T0 = temp
-       Q = self.tempModel.Q
-       T = Function(Q)
-
-       # Test and trial functions
-       phi, v = TrialFunction(Q), TestFunction(Q)
-
-       BC_left = DirichletBC(Q, self.tempModel.incoming_temp, self.boundary_parts, 3)
-       BC_bottom = DirichletBC(Q, Constant(self.tempModel.Tb), self.boundary_parts, 1)
-       BC_water = DirichletBC(Q, Constant(self.tempModel.Tb), self.boundary_parts, 5)
-       bcs = [BC_bottom,BC_left,BC_water]
-
-       # Bilinear form
-       F = inner(phi,v)*dx -inner(T0,v)*dx + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(phi),grad(v))*dx \
-            + Constant(0.5*dt*self.tempModel.kappa)*inner(grad(T0),grad(v))*dx
-       problem = LinearVariationalProblem(lhs(F),rhs(F), T, bcs)
-       solver = LinearVariationalSolver(problem)
-       solver.solve()
-       p.interpolate(T,2)
-
-
-       #facet_marker = MeshFunction('size_t', self.mesh.mesh, 1)
-       #facet_marker.set_all(0)
-
-
-       #ap = advect_particles(p, self.vector2, u,self.facet_marker)
-       #ap = advect_particles(p, self.vector2, u,"open")
-       #ap.do_step(dt_m*0.5)
-
-
-
        print('Starting to remesh')
        if remesh == True:
            if remesh_elastic==False:
+               #Temp = self.temp_model.advect_diffuse(T0,u,dt,self.scalar,self.boundary_parts,self.mesh.mesh)
+               #self.Temp = Temp
                if self.calving_front == False:
-                  # Update model mesh with new mesh
 
-                  # Need to update????
+                  # Update model mesh with new mesh
                   new_mesh=self.remesh(u,dt_m)
+                  u_eff = u
                   print('Finished remeshing')
                else:
                   # Update mesh coordinates to new coordinates
-                  self.remesh_elastic(u,dt_m)
+                  u_elastic=self.remesh_elastic(u,dt_m)
+                  #u_eff = u-u_elastic
+                  #u_eff = project(u-u_elastic,self.vector2)
+                  #Temp = self.temp_model.advect_diffuse(T0,u-u_elastic,dt,self.scalar,self.boundary_parts,self.mesh.mesh)
+                  #self.Temp = Temp
+                  ux,uz=u_elastic.split()
+
+
+                  # Update mesh coordinates
+                  coords = self.mesh.mesh.coordinates()
+                  coords[:,0]=coords[:,0]+ux.compute_vertex_values()*dt_m
+                  coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt_m
+
                   # And update bounding box tree
                   self.mesh.mesh.bounding_box_tree().build(self.mesh.mesh)
                   self.markBoundaries()
@@ -621,14 +594,24 @@ class Stokes2D:
                length = self.mesh.length
            else:
                #xm,zm = self.tracers.get_coords()
-               self.remesh_elastic(u,dt_m)
+               x,z = self.mesh.get_coords()
+               xmax = np.max(x)
+               u_elastic=self.remesh_elastic(u,dt_m)
+               u_eff = u-u_elastic
+               u_eff = project(u-u_elastic,self.vector2)
+               ux,uz=u_elastic.split()
 
+
+               # Update mesh coordinates
+               coords = self.mesh.mesh.coordinates()
+               coords[:,0]=coords[:,0]+ux.compute_vertex_values()*dt_m
+               coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt_m
 
                # And update bounding box tree
                self.mesh.mesh.bounding_box_tree().build(self.mesh.mesh)
                self.markBoundaries()
 
-               length = self.mesh.length
+               length = xmax*2.0
            #self.tracers.set_mesh(self.mesh)
        else:
            length = self.mesh.length
@@ -651,8 +634,26 @@ class Stokes2D:
        #ap = advect_rk3(p, self.vector2, u, "open")
        #ap.do_step(dt_m)
        return dt_m
-   def remesh_elastic_old(self,vel,dt):
+
+   def remesh_elastic(self,vel,dt):
+       """
+        Remesh by solving fictious elasticity problem
+            We will solve an elastic problem on the mesh with deformation defined by the displacement
+            associated with the velocity field along the boundaries
+       Updated to use 4th order (in space) Runge-Kutta method
+       """
+
+       # Mark above water line as subdomain 2
+       x,z = self.mesh.get_coords()
        left_wall = 0.0
+       class boundary(SubDomain):
+           "Mark above water line as subdomain."
+           def inside(self, x_values, on_boundary):
+               "Defines boundaries of right side above water subdomain."
+               return on_boundary
+       GAMMA_1 = boundary()
+       GAMMA_1.mark(self.boundary_parts, 1)
+
        # Mark left boundary as subdomain 3
        class Left(SubDomain):
           "Mark nodes along the left wall"
@@ -667,20 +668,33 @@ class Stokes2D:
        if self.calving_front==False:
            right_wall = self.mesh.length
            class Right(SubDomain):
-              "Mark nodes along the left wall"
+              "Mark nodes along the right wall"
               def inside(self, x_values, on_boundary):
                   "Defines boundaries of left subdomain."
                   return on_boundary and (right_wall-x_values[0]<100000000000*DOLFIN_EPS_LARGE)
            GAMMA_3 = Right()
            GAMMA_3.mark(self.boundary_parts, 2)
 
+       # First trial step for RK4 method
+       initial_coords = self.mesh.mesh.coordinates()
+       x1 = np.copy(self.mesh.mesh.coordinates()[:,0])
+       z1 = np.copy(self.mesh.mesh.coordinates()[:,1])
+       Q = self.vector # Function Space
+       u1 = interpolate(vel, VectorFunctionSpace(self.mesh.mesh, "CG", self.degree))
+       ux1,uz1=u1.split()
 
-       Q = VectorFunctionSpace(self.mesh.mesh, "CG", 1) # Function Space
+       # Effective velocity
+       Q = VectorFunctionSpace(self.mesh.mesh, "CG", self.degree) # Function Space
        uq = interpolate(vel,Q)
+       uq.vector()[:]=u1.vector().get_local()
+
+       # Create Dirichlet boundary conditions that apply the displacement to the boundary nodes
+       # Velocity boundary condition to boundary nodes that are displaced
+       bc1 = DirichletBC(Q, uq, self.boundary_parts, 1)
        bc2 = DirichletBC(Q.sub(0), Constant(0.0), self.boundary_parts, 2)
        bc2.apply(uq.vector())
 
-       # Create new mesh
+
        new_mesh = Mesh(self.mesh.mesh)
        coords = new_mesh.coordinates()
        ux,uz = uq.split(deepcopy=True)
@@ -688,39 +702,81 @@ class Stokes2D:
        coords[:,1]=coords[:,1]+uz.compute_vertex_values()*dt
 
        bmesh  = BoundaryMesh(new_mesh, 'exterior')
-       del new_mesh
-       q=ALE.move(model.mesh.mesh, bmesh)
+       new_mesh = Mesh(self.mesh.mesh)
+       q=ALE.move(new_mesh, bmesh)
+       V = VectorFunctionSpace(new_mesh, 'CG', 1)
+       q = interpolate(q,V)
+       q.vector()[:] /= dt
+       self.q = q
        return q
-   def remesh_elastic(self,vel,dt):
-       # Mark left wall
-       left_wall = 0.0
-       class Left(SubDomain):
-         "Mark nodes along the left wall"
-         def inside(self, x_values, on_boundary):
-             "Defines boundaries of left subdomain."
-             return on_boundary and (x_values[0]-left_wall<100000000000*DOLFIN_EPS_LARGE)
 
-       GAMMA_2 = Left()
-       GAMMA_2.mark(self.boundary_parts, 2)
+   def remesh(self,u,dt):
+       Q = self.mesh.Q_CG
+       ux,uz = u.split()
+       ux = project(ux,Q).vector().get_local()
+       uz = project(uz,Q).vector().get_local()
 
 
-       Vcg = VectorFunctionSpace(self.mesh.mesh, "CG", 1)
-       bc2 = DirichletBC(Vcg.sub(0), Constant(0.0), self.boundary_parts, 2)
-       umesh = project(vel * dt, Vcg)
-       bc2.apply(umesh.vector())
-       #ALE.move(self.mesh.mesh, umesh) # To update the entire mesh at once
+       # To do this we create a function and then mark top,bot, left and right
+       boundary_dofs= Function(Q)
+       bcTop = DirichletBC(Q, 12, self.boundary_parts, 2)
+       bcBot = DirichletBC(Q, 14, self.boundary_parts, 5)
+       bcBed = DirichletBC(Q, 14, self.boundary_parts, 1)
+       bcTop.apply(boundary_dofs.vector())
+       bcBot.apply(boundary_dofs.vector())
+       bcBed.apply(boundary_dofs.vector())
 
-       # Update mesh in two stages:
-       # First update boundary mesh based on the velocity
-       # Second update the mesh based on the boundary mesh
-       bmesh  = BoundaryMesh(self.mesh.mesh, 'exterior')
-       V = VectorFunctionSpace(bmesh, 'CG', 1)
-       u_boundary = interpolate(umesh,V)
-       # Move mesh boundary based on velocity
-       ALE.move(bmesh,u_boundary)
-       # Update interior based on boundary
-       ALE.move(self.mesh.mesh,bmesh)
+       # Extract coordinates corresponding to dofs
+       dof_coords = Q.tabulate_dof_coordinates().reshape((-1, 2));xdof=dof_coords[:,0];zdof=dof_coords[:,1]
+
+       # Save dof coordinates for debuggins and plotting
+       self.xdof = xdof
+       self.zdof = zdof
+
+       # Extract coordinates of bottom of mesh
+       bot_nodes = boundary_dofs.vector().get_local()==14
+       xbot=xdof[bot_nodes]
+       zbot=zdof[bot_nodes]
+
+       # Extract velocity components at bottom of the mesh
+       ux_bot = ux[bot_nodes]
+       uz_bot = uz[bot_nodes]
+
+       # Update bottom nodes
+       xbot+=ux_bot*dt
+       zbot+=uz_bot*dt
+
+       # Now update top nodes
+       # Extract coordinates of top of mesh
+       top_nodes = boundary_dofs.vector().get_local()==12
+       xtop=xdof[top_nodes]
+       ztop=zdof[top_nodes]
+
+       # Extract velocity components at top of the mesh
+       ux_top = ux[top_nodes]
+       uz_top = uz[top_nodes]
+
+       # Update top nodes
+       xtop+=ux_top*dt
+       ztop+=uz_top*dt
+
+       # Create interpolation function to define top and bottom of the ice
+       id1 = np.argsort(xbot)
+       id2 = np.argsort(xtop)
+       bot_fun= interp1d(xbot[id1],zbot[id1],fill_value="extrapolate")
+       surf_fun = interp1d(xtop[id2],ztop[id2],fill_value="extrapolate")
+
+       self.xtop = xtop[id2]
+       self.ztop = ztop[id2]
+       self.xbot = xbot[id1]
+       self.zbot = zbot[id1]
 
 
+       # Create a new mesh
+       bed_fun = self.mesh.bed_fun
+       Nx = self.mesh.Nx
+       Nz = self.mesh.Nz
+       length = self.mesh.length
+       new_mesh = gridModel.MeshModelPoly(surf_fun,bot_fun,bed_fun,Nx=Nx,Nz=Nz,length=length)
 
-       return umesh
+       return new_mesh
