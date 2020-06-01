@@ -42,9 +42,9 @@ def meshGmsh(geometryArray, meshSize):
     #Call the appropriate function to make the mesh. This is called on the geometry class that all of the points, lines, line loops, and surfaces have been added to.
     mesh = pygmsh.generate_mesh(geom,verbose=False)
 
-    path1 = os.path.join(tempfile.mkdtemp(), '.msh')
+    #path1 = os.path.join(tempfile.mkdtemp(), '.msh')
     path1 = tempfile.NamedTemporaryFile().name+'.msh'
-    path2 = os.path.join(tempfile.mkdtemp(), '.xdmf')
+    #path2 = os.path.join(tempfile.mkdtemp(), '.xdmf')
     path2 = tempfile.NamedTemporaryFile().name+'.xdmf'
 
     #meshio.write("tmp.msh", mesh)
