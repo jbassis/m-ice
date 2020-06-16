@@ -35,6 +35,8 @@ from leopart import (
 
 import time
 
+import os
+
 import pylab as plt
 
 import logging
@@ -81,6 +83,8 @@ Nz = int(ice_thick/dz)
 # Define geometry of domain
 surf_slope =  0.02
 bed_slope =   0.01
+left_vel = 5e3/material.secpera*material.time_factor
+
 
 L = length+ice_thick*0
 bump_width = ice_thick
@@ -120,12 +124,15 @@ p_max = 16
 
 #p_min = 16
 #p_max = 32
+print('Generating particles')
 gen = RandomCell(mesh.mesh)
 xp = gen.generate(p_min)
+print('Done generating particles')
 #_____________________________________________
 # Define function space for strain and temperature function
 Vdg = FunctionSpace(mesh.mesh, 'DG',1)
 
+print('Initializing function spaces')
 strain_mesh, temp_mesh, epsII_mesh = Function(Vdg), Function(Vdg), Function(Vdg)
 
 # Initial conditions for strain and temp
@@ -141,13 +148,18 @@ epsII_mesh.assign(strain_init)
 pstrain = assign_particle_values(xp, strain_fun)
 pepsII = assign_particle_values(xp, strain_fun)
 ptemp = assign_particle_values(xp, temp_fun)
+print('Done initializing function spaces')
+
 
 # Now we initialize the particle class
+print('Creating particles')
 p = particles(xp, [pstrain,ptemp,pepsII], mesh.mesh)
+print('Done particles')
+
 
 # Make sure we have enough particles per cell
-AD = AddDelete(p, p_min, p_max, [strain_mesh, temp_mesh,epsII_mesh]) # Sweep over mesh to delete/insert particles
-AD.do_sweep()
+#AD = AddDelete(p, p_min, p_max, [strain_mesh, temp_mesh,epsII_mesh]) # Sweep over mesh to delete/insert particles
+#AD.do_sweep()
 
 (xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
     p. return_property(mesh , 1) ,
@@ -155,12 +167,14 @@ AD.do_sweep()
     p. return_property(mesh , 3))
 #_____________________________________________
 # Initialize temperature model
+print('Initializing temperature')
 Tmodel = tempModel(mesh.mesh,Tb=Tb,Ts=Ts)
 x = SpatialCoordinate(mesh.mesh)
 zb = bot_fun(x[0])
 zs = surf_fun(x[0])
 Tmodel.set_mesh(mesh.mesh)
 Tmodel.set_temp(x,surf_fun,bot_fun,bed_fun)
+print('Done initializing temperature')
 
 #_____________________________________________
 # Viscosity and material properties
@@ -177,7 +191,6 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-left_vel = 2e3/material.secpera*material.time_factor
 right_vel = None # Outflow velocity is not used
 
 #_____________________________________________
@@ -204,7 +217,7 @@ model.m = 1.0/3.0 # Friction exponent
 
 #_____________________________________________
 # Maximum time step
-time_step_secs = 86400.0/16*2# Time step in seconds
+time_step_secs = 86400.0/16# Time step in seconds
 time_step = time_step_secs/material.time_factor # Convert time step to unit we are using
 
 
@@ -218,7 +231,11 @@ max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True # Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.01_flux_2.0_high_res_CFL/'
+fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_CFL/'
+if not os.path.exists(fname_base):
+    os.makedirs(fname_base)
+
+
 if save_files==True:
     import shutil
     shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
@@ -342,6 +359,7 @@ for i in range(i,100000):
        p.relocate()
 
    # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
+   Vdg = FunctionSpace(model.mesh.mesh, 'DG',1)
    ap = advect_rk3(p, model.vector2, model.u_k, "open")
    ap.do_step(time_step)
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
@@ -402,6 +420,8 @@ for i in range(i,100000):
    print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')
+   if t>1.0:
+       break
 
 
 #if model.method==1:
