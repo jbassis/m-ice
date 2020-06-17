@@ -51,7 +51,7 @@ set_log_active(False)
 plastic = True
 
 # Thick cliff
-cliff_type = 3
+cliff_type = 1
 
 # Surface and bottom temperatures
 Ts = -20.0
@@ -60,30 +60,35 @@ Tb = -20.0
 # Geometric variables
 # Case 1: Medium cliff
 if cliff_type == 1:
-    ice_thick = 400.0
-    Hab = 45.0
-# Case 2: Dry cliff
-elif cliff_type == 2:
     ice_thick = 135.0
     Hab = ice_thick
+    fname_dir = 'data/cliff/water_depth_0/'
+# Case 2: Dry cliff
+elif cliff_type == 2:
+    ice_thick = 400.0
+    Hab = 65.0
+    fname_dir = 'data/cliff/water_depth_300/'
 # Case 3: Thick cliff
 elif cliff_type == 3:
     ice_thick = 800.0
     Hab = 25.0
+    fname_dir = 'data/cliff/water_depth_700/'
 
 # Set length of domain and water depth
 length= ice_thick*12
 water_depth = ice_thick*910.0/1020 - Hab
+if cliff_type==1:
+    water_depth = 0.0
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333/2)
+dz = round(ice_thick/13.333333333*2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =   0.01
-left_vel = 5e3/material.secpera*material.time_factor
+bed_slope =   0.0
+left_vel = 0e3/material.secpera*material.time_factor
 
 
 L = length+ice_thick*0
@@ -217,7 +222,8 @@ model.m = 1.0/3.0 # Friction exponent
 
 #_____________________________________________
 # Maximum time step
-time_step_secs = 86400.0/16# Time step in seconds
+time_step_secs = 86400.0/16*2# Time step in seconds
+
 time_step = time_step_secs/material.time_factor # Convert time step to unit we are using
 
 
@@ -231,7 +237,7 @@ max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True # Set to True if we want to save output files
-fname_base = 'data/cliff/water_depth_700/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_CFL/'
+fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_CFL/'
 if not os.path.exists(fname_base):
     os.makedirs(fname_base)
 
@@ -243,7 +249,6 @@ if save_files==True:
 
 
 input_flux = left_vel*(surf_fun(0.0)-bot_fun(0.0)) # Define input flux at left edge of the domain
-CFL = 0.2
 CFL = 1.0
 model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
@@ -251,9 +256,6 @@ i =0
 model.strain = Function(model.mesh.Q)
 L2_strain = []
 tlist = []
-model.deps_dt = None
-model.deps_dt_old = None
-model.deps_dt_older = None
 model.method = 1
 for i in range(i,100000):
    L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
@@ -412,7 +414,7 @@ for i in range(i,100000):
    ax1.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
    plt.xlim([0,max_length])
    plt.pause(1e-16);
-   print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
+   print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0),'Percent yielded',np.sum(pstrain>0)/len(pstrain),'Maximum strain',np.max(pstrain))
 
    # Print some diagnostics to screen for debugging purpose
    t = t+time_step
