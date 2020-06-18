@@ -545,7 +545,7 @@ class Stokes2D:
            pstrain_new = self.visc_func.update(pepsII,ptemp,pstrain,dt_m)
            pstrain_new = np.maximum(pstrain_new,0.0)
 
-       pstrain_new[xp[:,0]<1e3]=0.0
+       #pstrain_new[xp[:,0]<1e3]=0.0
        p.change_property(pstrain_new,1)
 
 

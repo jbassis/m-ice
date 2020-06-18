@@ -51,7 +51,7 @@ set_log_active(False)
 plastic = True
 
 # Thick cliff
-cliff_type = 1
+cliff_type = 2
 
 # Surface and bottom temperatures
 Ts = -20.0
@@ -63,25 +63,36 @@ if cliff_type == 1:
     ice_thick = 135.0
     Hab = ice_thick
     fname_dir = 'data/cliff/water_depth_0/'
+    xyield_min = 0.0
+    water_depth = 0.0
 # Case 2: Dry cliff
 elif cliff_type == 2:
     ice_thick = 400.0
     Hab = 65.0
     fname_dir = 'data/cliff/water_depth_300/'
+    xyield_min = 0.0
+    water_depth = ice_thick*910.0/1020 - Hab
 # Case 3: Thick cliff
-elif cliff_type == 3:
+if cliff_type == 3:
     ice_thick = 800.0
     Hab = 25.0
     fname_dir = 'data/cliff/water_depth_700/'
-
+    xyield_min = 3e3
+    water_depth = ice_thick*910.0/1020 - Hab
+elif cliff_type == 4:
+    ice_thick = 135.0
+    Hab = ice_thick
+    fname_dir = 'data/cliff/water_depth_20/'
+    xyield_min = 0.0
+    water_depth = 20.0
 # Set length of domain and water depth
 length= ice_thick*12
-water_depth = ice_thick*910.0/1020 - Hab
-if cliff_type==1:
-    water_depth = 0.0
+#water_depth = ice_thick*910.0/1020 - Hab
+
+
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
-dz = round(ice_thick/13.333333333*2)
+dz = round(ice_thick/13.333333333/2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
@@ -258,9 +269,9 @@ L2_strain = []
 tlist = []
 model.method = 1
 for i in range(i,100000):
-   L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
+   #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
    #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
-   tlist.append(t)
+   #tlist.append(t)
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
 
@@ -372,7 +383,7 @@ for i in range(i,100000):
        p. return_property(mesh , 1) ,
        p. return_property(mesh , 2),
        p. return_property(mesh , 3))
-   pstrain[xp[:,0]<3e3]=0.0
+   pstrain[xp[:,0]<xyield_min]=0.0
    p.change_property(pstrain,1)
 
 
