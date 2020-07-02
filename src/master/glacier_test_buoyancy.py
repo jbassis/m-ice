@@ -51,11 +51,11 @@ set_log_active(False)
 plastic = True
 
 # Thick cliff
-cliff_type = 2
+cliff_type = 3
 
 # Surface and bottom temperatures
-Ts = -20.0
-Tb = -20.0
+Ts = -15.0
+Tb = -15.0
 
 # Geometric variables
 # Case 1: Medium cliff
@@ -68,10 +68,10 @@ if cliff_type == 1:
 # Case 2: Dry cliff
 elif cliff_type == 2:
     ice_thick = 400.0
-    Hab = 65.0
-    fname_dir = 'data/cliff/water_depth_300/'
+    #Hab = 65.0
+    fname_dir = 'data/cliff/water_depth_290/'
     xyield_min = 0.0
-    water_depth = ice_thick*910.0/1020 - Hab
+    water_depth = 290.0
 # Case 3: Thick cliff
 if cliff_type == 3:
     ice_thick = 800.0
@@ -98,7 +98,7 @@ Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =   0.0
+bed_slope =  -0.1
 left_vel = 0e3/material.secpera*material.time_factor
 
 
@@ -248,7 +248,7 @@ max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True # Set to True if we want to save output files
-fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_CFL/'
+fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_T_'+str(Tb)+'_CFL/'
 if not os.path.exists(fname_base):
     os.makedirs(fname_base)
 
@@ -344,6 +344,7 @@ for i in range(i,100000):
           temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
           temp_file=HDF5File(model.mesh.mesh.mpi_comm(), temp_file_name, 'w')
           temp_file.write(u,'u')
+          temp_file.write(model.strain,'strain')
           temp_file.close()
 
 
@@ -433,7 +434,7 @@ for i in range(i,100000):
    print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')
-   if t>1.0:
+   if t>2.01:
        break
 
 

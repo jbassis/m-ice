@@ -6,11 +6,11 @@ pt = sort_boundary_nodes(bmesh)
 
 
 # Remove two points that must be determined by manual inspection
-pts = vstack((pt[0:436,:],pt[439::,:]))## Identify which points to remove
+pts = vstack((pt[0:487,:],pt[490::,:]))## Identify which points to remove
 #pts = pt
-#pts = vstack((pt[0:483,:],pt[294:394,:],pt[397::,:]))## Identify which points to remove
+#pts = vstack((pt[0:359,:],pt[294:394,:],pt[397::,:]))## Identify which points to remove
 
-#pts = vstack((pts[0:369,:],pts[414::,:]))## Identify which points to remove
+#pts = vstack((pts[0:412,:],pts[413::,:]))## Identify which points to remove
 
 
 # Make a new mesh based on remeshing stuff . . .
@@ -19,7 +19,6 @@ pt_new = []
 pt_flag = None
 length_flag = True
 xcliff = max_length
-xcliff = 12e3
 
 for n in range(len(pts)):
     pt = pts[n]
@@ -65,6 +64,9 @@ AD.do_sweep()
 
 
 for i in range(i,100000):
+   #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
+   #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
+   #tlist.append(t)
    # First need to interpolate tracer quantities to nodes
    #node_vars = particles.tracers_to_nodes()
 
@@ -76,7 +78,6 @@ for i in range(i,100000):
        quality=np.min(MeshQuality.radius_ratios(model.mesh.mesh).array())
        time_step = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
        time_step = np.minimum(time_step_secs/material.time_factor,time_step)
-   #time_step = time_step_secs/material.time_factor
 
 
    print('Time step',time_step)
@@ -85,11 +86,11 @@ for i in range(i,100000):
    # Do a little bit of accounting to make sure that our time step doesn't violate the CFL criterion
    ux, uz = model.get_velocity();speed = np.sqrt(ux**2+uz**2)
    Q0 = FunctionSpace(model.mesh.mesh, "DG", 0)
-   #time_step_CFL = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
-   #print('Time step CFL',time_step_CFL)
-   #if time_step_CFL<time_step:
-   #   time_step=time_step_CFL
-   #  u,pres = model.solve(node_vars,dt=time_step,tolerance=model.tolerance);#model.u_k = None
+   time_step_CFL = CFL*np.min(project(CellDiameter(model.mesh.mesh)/sqrt(inner(u,u)),Q0).compute_vertex_values())
+   print('Time step CFL',time_step_CFL)
+   #if time_step_CFL<0.5*time_step:
+    #   time_step=time_step_CFL
+     #  u,pres = model.solve(node_vars,dt=time_step,tolerance=model.tolerance);#model.u_k = None
    #xm,zm = particles.get_coords()
 
    #particles.tracers['Strain'][xm<1e3]=particles.tracers['Strain'][xm<1e3]/(1.0+time_step/tau)
@@ -138,6 +139,7 @@ for i in range(i,100000):
           temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
           temp_file=HDF5File(model.mesh.mesh.mpi_comm(), temp_file_name, 'w')
           temp_file.write(u,'u')
+          temp_file.write(model.strain,'strain')
           temp_file.close()
 
 
@@ -162,14 +164,12 @@ for i in range(i,100000):
           p. return_property(mesh , 3))
        del p
        p = particles(xp, [pstrain,ptemp,pepsII], model.mesh.mesh)
-
    else:
        p.relocate()
 
    # Advect particles -- Turn this on to advect particles now that it is removed from Stokes script
-   #p.relocate()
-   ap = advect_particles(p, model.vector2, model.u_k, "open")
-   #ap = advect_particles(p, model.vector2, u,model.facet_marker)
+   Vdg = FunctionSpace(model.mesh.mesh, 'DG',1)
+   ap = advect_rk3(p, model.vector2, model.u_k, "open")
    ap.do_step(time_step)
    AD = AddDelete(p, p_min, p_max, [interpolate(model.strain,Vdg), interpolate(model.temp,Vdg) , interpolate(model.epsII,Vdg)]) # Sweep over mesh to delete/insert particles
    AD.do_sweep()
@@ -179,6 +179,9 @@ for i in range(i,100000):
        p. return_property(mesh , 1) ,
        p. return_property(mesh , 2),
        p. return_property(mesh , 3))
+   pstrain[xp[:,0]<xyield_min]=0.0
+   p.change_property(pstrain,1)
+
 
    xx=np.linspace(0,length*1.5,101)
    xs=np.linspace(0,length,101)
@@ -218,7 +221,7 @@ for i in range(i,100000):
    ax1.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
    plt.xlim([0,max_length])
    plt.pause(1e-16);
-   print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0))
+   print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0),'Percent yielded',np.sum(pstrain>0)/len(pstrain),'Maximum strain',np.max(pstrain))
 
    # Print some diagnostics to screen for debugging purpose
    t = t+time_step

@@ -13,10 +13,16 @@ width  = 3.487*3.0/1.25
 height = width / 1.618
 height = width/7*2
 
+
+water_depth = 290
+surf_slope =  0.02
+bed_slope =   0.0
+flux = 0.0
+
 # Base directory for file
 fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_2.0_high_res/glacier_cliff_'
 fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_3.5_high_res_CFL/glacier_cliff_'
-fname_base ='../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_3.0_high_res_CFL/glacier_cliff_'
+fname_base ='../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(flux)+'_high_res_T_-20.0_CFL/glacier_cliff_'
 fname_out = fname_base#+'junk'
 
 
@@ -27,24 +33,23 @@ fname_out = fname_base#+'junk'
 
 
 
-#ice_thick = 400.0
+ice_thick = 400.0
 #Hab = 60.0
 #Hab = 45.0
 #ice_thick = 135.0
 #Hab = ice_thick
-ice_thick = 800.0
-Hab = 25.0
+#ice_thick = 800.0
+#Hab = 25.0
 length= ice_thick*12
-water_depth = ice_thick*910.0/1020 - Hab
-
+#water_depth = ice_thick*910.0/1020 - Hab
+#water_depth = 20
 #dz = 60.0
 dz = round(ice_thick/13.333333333/2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
 # Define surface, bottom, etc
-surf_slope =  0.02
-bed_slope =  -0.01
+
 
 notch_height = 200.0*0
 notch_length = 40.0
@@ -83,8 +88,8 @@ fig.subplots_adjust(left=-0.0, bottom=.07, right=0.92, top=.95)
 #plt.tick_params(axis='both', which='major', labelsize=20)
 
 #for step in xrange(8350,9040,10):
-#for step in range(10420,10490,10):
-for step in range(0,540,10):
+#for step in range(7220,8230,10):
+for step in range(0,1040,10):
 
 
 
