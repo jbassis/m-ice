@@ -54,8 +54,10 @@ plastic = True
 cliff_type = 3
 
 # Surface and bottom temperatures
-Ts = -15.0
-Tb = -15.0
+Ts = -20.0
+Tb = -20.0
+
+melange = False
 
 # Geometric variables
 # Case 1: Medium cliff
@@ -98,8 +100,8 @@ Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =  -0.1
-left_vel = 0e3/material.secpera*material.time_factor
+bed_slope =  -0.07
+left_vel = 2e3/material.secpera*material.time_factor
 
 
 L = length+ice_thick*0
@@ -207,7 +209,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-right_vel = None # Outflow velocity is not used
+right_vel = 0.0 # Outflow velocity is not used
 
 #_____________________________________________
 # Define our model and some parameters
@@ -231,6 +233,11 @@ model.bed_yield_stregth = 400e3
 model.friction = 4e6#/(surf_fun(0)-bed_fun(0))/model.rho_i/model.g # Friction coefficient
 model.m = 1.0/3.0 # Friction exponent
 
+model.left_wall = 0.0
+if melange == True:
+    model.right_wall = 5.5e3
+else:
+    model.right_wall = 1e6
 #_____________________________________________
 # Maximum time step
 time_step_secs = 86400.0/16*2# Time step in seconds
@@ -320,7 +327,7 @@ for i in range(i,100000):
 
    #remesh_elastic = False
    print(remesh_elastic)
-   if np.mod(i,10)==0:
+   if np.mod(i,50)==0:
       #particles.tracers['Strain'][xm<3.5e3]=0.0
       if save_files == True:
           #uxm = particles.tracers['ux']
@@ -416,6 +423,9 @@ for i in range(i,100000):
        ax.plot(xx,bot_fun(xx),color='brown',linewidth=2)
        ax.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
        ax.plot(xs,surf_fun(xs),'--',color='gray')
+       if melange == True:
+           plt.gca()
+           plt.axvline(model.right_wall,linestyle='--',color='k')
    ax2.spines['bottom'].set_visible(True)
    ax2.set_xticks([0,3e3,10*ice_thick,max_length])
    ax2.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
@@ -434,7 +444,7 @@ for i in range(i,100000):
    print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')
-   if t>2.01:
+   if t>1.01:
        break
 
 
