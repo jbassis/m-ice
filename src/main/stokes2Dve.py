@@ -222,8 +222,8 @@ class Stokes2D:
 
        sea_level = self.sea_level
        x,z = self.mesh.get_coords()
-       left_wall = np.min(x)
-       right_wall = np.max(x)
+       left_wall = self.left_wall #np.min(x)
+       right_wall = self.right_wall#np.max(x)
        top = np.max(z)
        bot = np.min(z)
 
@@ -282,9 +282,9 @@ class Stokes2D:
                def inside(self, x_values, on_boundary):
                    "Defines boundaries of right subdomain."
                    return on_boundary and (right_wall-x_values[0]<1000000000*DOLFIN_EPS_LARGE)
-
            GAMMA_4 = Right()
            GAMMA_4.mark(self.boundary_parts, 4,check_midpoint=False)
+
 
        self.BCS = []
        if self.left_vel != None:
@@ -665,8 +665,8 @@ class Stokes2D:
        GAMMA_2.mark(self.boundary_parts, 2)
 
        # Mark left boundary as subdomain 3
-       if self.calving_front==False:
-           right_wall = self.mesh.length
+       if self.right_vel !=None:
+           right_wall = self.right_wall
            class Right(SubDomain):
               "Mark nodes along the right wall"
               def inside(self, x_values, on_boundary):
