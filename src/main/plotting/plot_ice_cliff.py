@@ -16,18 +16,19 @@ height = width/7*2
 
 water_depth = 700
 surf_slope =  0.02
-bed_slope =   -0.03
-flux = 4.0
+bed_slope =   0.02
+flux = 3.0
 
 # Base directory for file
 fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_2.0_high_res/glacier_cliff_'
 fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.01_flux_3.5_high_res_CFL/glacier_cliff_'
 #fname_base ='../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(flux)+'_high_res_T_-15.0melange_CFL/glacier_cliff_'
-fname_base ='../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(flux)+'_high_res_T_-10.0_CFL/glacier_cliff_'
+fname_base ='../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(flux)+'_high_res_CFL/glacier_cliff_'
 #fname_base ='../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.02_flux_4.0_high_res_T_-15.0melange_CFL/glacier_cliff_'
+fname_base = '../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_0.02_bed_slope_0.0_flux_0.0_high_res_T_-20.0_buttressing25.0kPa_CFL/glacier_cliff_'
 fname_out = fname_base#+'junk'
 
-
+fname_out = '../data/cliff/water_depth_700_super_buoyancy_crevasse/glacier_surf_slope_0.02_bed_slope_0.02_flux_3.0_high_res_T_-20.0_CFL/'
 # Specify file to load
 
 
@@ -35,15 +36,16 @@ fname_out = fname_base#+'junk'
 
 
 
-ice_thick = 400.0
-#Hab = 60.0
+ice_thick = 800.0
+Hab = -10.0
 #Hab = 45.0
 #ice_thick = 135.0
 #Hab = ice_thick
-ice_thick = 800.0
+#ice_thick = 800.0
+#ice_thick = 135
 #Hab = 25.0
 length= ice_thick*12
-#water_depth = ice_thick*910.0/1020 - Hab
+water_depth = ice_thick*910.0/1020 - Hab
 #water_depth = 20
 #dz = 60.0
 dz = round(ice_thick/13.333333333/2)
@@ -95,7 +97,8 @@ import glob
 import os
 list_of_files = glob.glob(fname_out+'*.npz') # * means all if need specific format then *.csv
 latest_file = max(list_of_files, key=os.path.getctime)
-for step in range(760,770,10):
+#for step in range(0,680,10):
+for latest_file in list_of_files:
 
 
 
@@ -105,11 +108,12 @@ for step in range(760,770,10):
 
 
    # File extension
-   fname_ext = str(step).zfill(3)+'.npz'
+   #fname_ext = 'no_buttressing'+str(step).zfill(3)+'.npz'
+   #fname_ext = str(step).zfill(3)+'.npz'
 
 
    # Filename
-   fname = fname_base+fname_ext
+   #fname = fname_base+fname_ext
    fname = latest_file
    print(fname)
 
@@ -140,6 +144,7 @@ for step in range(760,770,10):
    plt.plot(xs,hs,'--',color='Gray',linewidth=2)
    plt.plot([xs[-1],xs[-1]],[hs[-1],bed_fun(xs[-1])],'--',color='Gray',linewidth=2)
    ax=plt.gca()
+   #ax.text(4500,bed_fun(length/2)+ice_thick+surf_slope*length+20,'buttressing',color='red',fontweight='bold',fontsize=14)
    ax.set_xticks([])
    ax.set_yticks([])
    ax.spines['right'].set_visible(False)
@@ -163,8 +168,8 @@ for step in range(760,770,10):
 
    ax.annotate ('', (-ice_thick/5, bed_fun(0.0)), (-ice_thick/5, bed_fun(0.0)+ice_thick+(surf_slope-bed_slope)*length), arrowprops={'arrowstyle':'<->','linewidth':2})
    ax.annotate(
-       text_str, xy=(-ice_thick/5, bed_fun(0)+120), xycoords='data',
-       xytext=(-15, 0), textcoords='offset points',rotation=90)
+      text_str, xy=(-ice_thick/5,  0.5*(2*bed_fun(0)+ice_thick+(surf_slope-bed_slope)*length)), xycoords='data',
+      xytext=(-15, 0), textcoords='offset points',rotation=90,va='center')
 
 
    yr = int(mod(t,365))
@@ -199,18 +204,23 @@ for step in range(760,770,10):
 
    ax.annotate ('', (-ice_thick/5, bed_fun(0.0)), (-ice_thick/5, bed_fun(0.0)+ice_thick+(surf_slope-bed_slope)*length), arrowprops={'arrowstyle':'<->','linewidth':2})
    ax.annotate(
-      text_str, xy=(-ice_thick/5,  bed_fun(0)+120), xycoords='data',
-      xytext=(-15, 0), textcoords='offset points',rotation=90)
+      text_str, xy=(-ice_thick/5,  0.5*(2*bed_fun(0)+ice_thick+(surf_slope-bed_slope)*length)), xycoords='data',
+      xytext=(-15, 0), textcoords='offset points',rotation=90,va='center')
 
    ax.annotate ('', (0.0, np.minimum(bed_fun(0),bed_fun(length))-ice_thick/3), (int(max_length), np.minimum(bed_fun(0),bed_fun(length))-ice_thick/3), arrowprops={'arrowstyle':'<->','linewidth':2})
    ax.annotate(
     text_str2, xy=(max_length/2, np.minimum(bed_fun(0),bed_fun(length))-ice_thick/3), xycoords='data',
     xytext=(0, -10), textcoords='offset points')
 
+
+
    plt.subplots_adjust(wspace=0, hspace=0)
    plt.pause(1e-16)
    plt.show()
-   fname_ext = str(step).zfill(3)+'.png'
+
+   #fname_ext = str(step).zfill(3)+'.png'
    #fname_base= 'data/tmp8/glacier_cliff_'
-   fname = fname_out+fname_ext
+   #fname = fname_out+fname_ext
+
+   fname = fname[0:-3]+'.png'
    plt.savefig(fname)

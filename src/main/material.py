@@ -27,6 +27,7 @@ class glenFlow(object):
         self.visc_min = 1e8
         self.visc_max = 1e18
         self.mu = 0.0
+        self.num_yielded = 0.0
 
     def set_grain_size(self, grain_size):
         self.grain_size = grain_size
@@ -100,7 +101,13 @@ class glenFlow(object):
 
         eta_visc = self.ductile_visc(epsII,temp,functionSpace=None)
         eta_plas = self.plastic_visc(epsII,strain,functionSpace=None)
+        #eta = (1/eta_visc + 1/eta_plas)**(-1)
+        #eta = self.__call__(epsII,temp,strain,functionSpace=None)
+        #F = 2*eta*epsII
+        #epsII_visc = F/eta_visc
+        epsII_visc = 0.0 # In case we want to subtract viscous strain rate
         deps =  (eta_visc>eta_plas)*np.maximum(epsII,0.0)*dt
+        self.num_yielded = sum(eta_visc>eta_plas)/len(epsII)
         return deps
 
     def __call__(self,epsII,temp,strain,functionSpace=None):

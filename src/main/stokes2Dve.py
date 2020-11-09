@@ -221,6 +221,8 @@ class Stokes2D:
        """
 
        sea_level = self.sea_level
+       buttressing_height_min = self.buttressing_height_min
+       buttressing_height_max = self.buttressing_height_min
        x,z = self.mesh.get_coords()
        left_wall = self.left_wall #np.min(x)
        right_wall = self.right_wall#np.max(x)
@@ -252,6 +254,16 @@ class Stokes2D:
 
        GAMMA_5 = RightBelow()
        GAMMA_5.mark(self.boundary_parts, 5,check_midpoint=False)
+
+       # Mark below water boundary as subdomain 5
+       class Buttressing(SubDomain):
+           "Mark 10 meters above water line to apply buttressing"
+           def inside(self, x_values, on_boundary):
+               "Defines boundaries of right side above water subdomain."
+               return on_boundary and (x_values[1] >= sea_level-buttressing_height_min) and (x_values[1]<=sea_level+buttressing_height_max)
+
+       GAMMA_6 = Buttressing()
+       GAMMA_6.mark(self.boundary_parts, 6,check_midpoint=False)
 
        # Mark bottom boundary facets as subdomain 1
        class Bottom(SubDomain):
@@ -289,10 +301,12 @@ class Stokes2D:
        self.BCS = []
        if self.left_vel != None:
            BCL = DirichletBC(self.system.sub(1).sub(0), Constant(self.left_vel), self.boundary_parts, 3)
+           #BCL = DirichletBC(self.system.sub(1), (Constant(self.left_vel),Constant(0.0)), self.boundary_parts, 3)
            self.BCS.append(BCL)
 
        if self.right_vel !=None:
            BCR = DirichletBC(self.system.sub(1).sub(0), Constant(self.right_vel), self.boundary_parts, 4)
+           #BCR = DirichletBC(self.system.sub(1), (Constant(self.right_vel),Constant(0.0)), self.boundary_parts, 4)
            self.BCS.append(BCR)
 
        self.DS = Measure("ds")(subdomain_data=self.boundary_parts)
@@ -393,8 +407,13 @@ class Stokes2D:
              + inner((self.GROUND_PRESSURE_SCALAR+self.water_pressure)*normE, v)*self.DS(1) \
              + inner(dot(v, tanE), friction*dot(u, tanE))*self.DS(1) \
              + inner(self.below_sea_level*water_drag*u, v)*self.DS(5) \
+             + inner(self.water_pressure*normE, v)*self.DS(6) \
+             + inner(self.below_sea_level*self.rho_w*self.g*dot((dt_step*u)*np.abs(N[1]), z_vector)*z_vector, v)*self.DS(6) \
+             + inner(self.below_sea_level*water_drag*u, v)*self.DS(6) \
+             + inner(v,lateral_drag*u)*dx \
+             + inner(self.buttressing, v[0])*self.DS(6) \
              - inner(self.f, v)*dx \
-             + inner(v,lateral_drag*u)*dx
+
 
        # Solves problem . . . .
        w = Function(self.system)
@@ -453,6 +472,7 @@ class Stokes2D:
        self.u_p = w
        self.u = u
        self.p = p
+       self.eta = eta
 
        return u,p
 
@@ -645,7 +665,7 @@ class Stokes2D:
 
        # Mark above water line as subdomain 2
        x,z = self.mesh.get_coords()
-       left_wall = 0.0
+       left_wall = self.left_wall
        class boundary(SubDomain):
            "Mark above water line as subdomain."
            def inside(self, x_values, on_boundary):
@@ -662,7 +682,7 @@ class Stokes2D:
               return on_boundary and (x_values[0]-left_wall<100000000000*DOLFIN_EPS_LARGE)
 
        GAMMA_2 = Left()
-       GAMMA_2.mark(self.boundary_parts, 2)
+       GAMMA_2.mark(self.boundary_parts, 3)
 
        # Mark left boundary as subdomain 3
        if self.right_vel !=None:
@@ -673,7 +693,7 @@ class Stokes2D:
                   "Defines boundaries of left subdomain."
                   return on_boundary and (right_wall-x_values[0]<100000000000*DOLFIN_EPS_LARGE)
            GAMMA_3 = Right()
-           GAMMA_3.mark(self.boundary_parts, 2)
+           GAMMA_3.mark(self.boundary_parts, 3)
 
        # First trial step for RK4 method
        initial_coords = self.mesh.mesh.coordinates()
@@ -691,7 +711,7 @@ class Stokes2D:
        # Create Dirichlet boundary conditions that apply the displacement to the boundary nodes
        # Velocity boundary condition to boundary nodes that are displaced
        bc1 = DirichletBC(Q, uq, self.boundary_parts, 1)
-       bc2 = DirichletBC(Q.sub(0), Constant(0.0), self.boundary_parts, 2)
+       bc2 = DirichletBC(Q.sub(0), Constant(0.0), self.boundary_parts, 3)
        bc2.apply(uq.vector())
 
 

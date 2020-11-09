@@ -6,11 +6,11 @@ pt = sort_boundary_nodes(bmesh)
 
 
 # Remove two points that must be determined by manual inspection
-pts = vstack((pt[0:487,:],pt[490::,:]))## Identify which points to remove
+#pts = vstack((pt[0:360,:],pt[372::,:]))## Identify which points to remove
 #pts = pt
-#pts = vstack((pt[0:359,:],pt[294:394,:],pt[397::,:]))## Identify which points to remove
+pts = vstack((pt[0:360,:],pt[272:412,:],pt[416::,:]))## Identify which points to remove
 
-#pts = vstack((pts[0:412,:],pts[413::,:]))## Identify which points to remove
+#pts = vstack((pts[0:443,:],pts[448::,:]))## Identify which points to remove
 
 
 # Make a new mesh based on remeshing stuff . . .
@@ -18,7 +18,7 @@ pts = vstack((pt[0:487,:],pt[490::,:]))## Identify which points to remove
 pt_new = []
 pt_flag = None
 length_flag = True
-xcliff = max_length
+xcliff = 12000e3*1e8
 
 for n in range(len(pts)):
     pt = pts[n]

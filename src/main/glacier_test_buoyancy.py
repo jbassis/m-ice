@@ -58,6 +58,9 @@ Ts = -20.0
 Tb = -20.0
 
 melange = False
+buttressing = 1e-32
+buttressing_height_max = 25.0 # In meters
+buttressing_height_min = 55.0 # In meters
 
 # Geometric variables
 # Case 1: Medium cliff
@@ -74,11 +77,12 @@ elif cliff_type == 2:
     fname_dir = 'data/cliff/water_depth_290/'
     xyield_min = 0.0
     water_depth = 290.0
+
 # Case 3: Thick cliff
-if cliff_type == 3:
+elif cliff_type == 3:
     ice_thick = 800.0
     Hab = 25.0
-    fname_dir = 'data/cliff/water_depth_700/'
+    fname_dir = 'data/cliff/water_depth_700_no_failure/'
     xyield_min = 3e3
     water_depth = ice_thick*910.0/1020 - Hab
 elif cliff_type == 4:
@@ -87,6 +91,16 @@ elif cliff_type == 4:
     fname_dir = 'data/cliff/water_depth_20/'
     xyield_min = 0.0
     water_depth = 20.0
+elif cliff_type == 5:
+    ice_thick = 400.0
+    fname_dir = 'data/cliff/water_depth_300/'
+    xyield_min = 0.0
+    water_depth = 300.0
+elif cliff_type == 6:
+    ice_thick = 400.0
+    fname_dir = 'data/cliff/water_depth_295/'
+    xyield_min = 0.0
+    water_depth = 295.0
 # Set length of domain and water depth
 length= ice_thick*12
 #water_depth = ice_thick*910.0/1020 - Hab
@@ -100,8 +114,8 @@ Nz = int(ice_thick/dz)
 
 # Define geometry of domain
 surf_slope =  0.02
-bed_slope =  -0.07
-left_vel = 2e3/material.secpera*material.time_factor
+bed_slope =   0.02
+left_vel = 0e3/material.secpera*material.time_factor
 
 
 L = length+ice_thick*0
@@ -230,7 +244,7 @@ B = 0.75e8
 width = 10e3
 model.lateral_drag = 2*(4)**(1.0/3)*B/(width**(4.0/3))*0
 model.bed_yield_stregth = 400e3
-model.friction = 4e6#/(surf_fun(0)-bed_fun(0))/model.rho_i/model.g # Friction coefficient
+model.friction = 4e6/3#/(surf_fun(0)-bed_fun(0))/model.rho_i/model.g # Friction coefficient
 model.m = 1.0/3.0 # Friction exponent
 
 model.left_wall = 0.0
@@ -255,7 +269,9 @@ max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
 save_files = True # Set to True if we want to save output files
+#fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_T_'+str(Tb)+'_buttressing'+str(buttressing/1e3)+'kPa_CFL/'
 fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_T_'+str(Tb)+'_CFL/'
+
 if not os.path.exists(fname_base):
     os.makedirs(fname_base)
 
@@ -275,6 +291,11 @@ model.strain = Function(model.mesh.Q)
 L2_strain = []
 tlist = []
 model.method = 1
+model.buttressing = buttressing # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
+model.buttressing_height_max = buttressing_height_max # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
+model.buttressing_height_min = buttressing_height_min # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
+
+model.buttressing = 1e-32
 for i in range(i,100000):
    #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
    #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
@@ -316,9 +337,9 @@ for i in range(i,100000):
        remesh_elastic=False
        model.mesh.length=min_length
 
-   if model.mesh.mesh.hmax()/model.mesh.mesh.hmin() > 10.0:
-       remesh_elastic=False
-       model.mesh.length=min_length
+   #if model.mesh.mesh.hmax()/model.mesh.mesh.hmin() > 10.0:
+    #   remesh_elastic=False
+     #  model.mesh.length=min_length
 
    quality=np.min(MeshQuality.radius_ratios(model.mesh.mesh).array())
    if quality<0.1:
@@ -327,7 +348,7 @@ for i in range(i,100000):
 
    #remesh_elastic = False
    print(remesh_elastic)
-   if np.mod(i,50)==0:
+   if np.mod(i,10)==0:
       #particles.tracers['Strain'][xm<3.5e3]=0.0
       if save_files == True:
           #uxm = particles.tracers['ux']
