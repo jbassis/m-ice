@@ -27,9 +27,10 @@ if T==-20.0:
     fname_dir = '../data/cliff/water_depth_700/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(flux)+'_high_res_CFL/'
 #fname_dir ='../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_0.0_flux_0.0_high_res_T_-20.0_buttressing25.0kPa_CFL/'
 #fname_dir ='../data/cliff/water_depth_0/glacier_surf_slope_0.02_bed_slope_0.0_flux_0.0_high_res_T_-20.0_CFL/'
-#fname_dir = '../data/cliff/water_depth_0/glacier_surf_slope_0.02_bed_slope_0.0_flux_0.0_high_res_T_-20.0_CFL/'
-fname_dir = '../data/cliff/water_depth_700_high_friction/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(-0.01)+'_flux_'+str(0.0)+'_high_res_T_'+str(T)+'_CFL/'
-
+fname_dir = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.02_flux_2.0_high_res_T_-20.0_CFL/'
+#fname_dir = '../data/cliff/water_depth_700_high_friction/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(-0.01)+'_flux_'+str(0.0)+'_high_res_T_'+str(T)+'_CFL/'
+#fname_dir = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.02_flux_2.0_high_res_CFL/'
+fname_dir  = '../data/buttressing/water_depth_700_buttressing_25.0kPa_removed_50.0day/glacier_surf_slope_0.02_bed_slope_-0.02_flux_2.0_high_res_T_-20.0_CFL/'
 fname_base = fname_dir + 'glacier_cliff_'
 #fname_base = fname_dir + 'glacier_cliff_'
 

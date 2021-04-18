@@ -16,7 +16,7 @@ height = width/7*2
 
 water_depth = 700
 surf_slope =  0.02
-bed_slope =   0.02
+bed_slope =  -0.02
 flux = 3.0
 
 # Base directory for file
@@ -26,9 +26,11 @@ fname_base = '../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0
 fname_base ='../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(flux)+'_high_res_CFL/glacier_cliff_'
 #fname_base ='../data/cliff/water_depth_700/glacier_surf_slope_0.02_bed_slope_-0.02_flux_4.0_high_res_T_-15.0melange_CFL/glacier_cliff_'
 fname_base = '../data/cliff/water_depth_'+str(water_depth)+'/glacier_surf_slope_0.02_bed_slope_0.0_flux_0.0_high_res_T_-20.0_buttressing25.0kPa_CFL/glacier_cliff_'
+fname_base = '../data/buttressing/water_depth_700_buttressing_25.0kPa_removed_50.0day/glacier_surf_slope_0.02_bed_slope_-0.02_flux_2.0_high_res_T_-20.0_CFL/glacier_cliff_'
+
 fname_out = fname_base#+'junk'
 
-fname_out = '../data/cliff/water_depth_700_super_buoyancy_crevasse/glacier_surf_slope_0.02_bed_slope_0.02_flux_3.0_high_res_T_-20.0_CFL/'
+#fname_out = '../data/cliff/water_depth_700_super_buoyancy_crevasse/glacier_surf_slope_0.02_bed_slope_0.02_flux_3.0_high_res_T_-20.0_CFL/'
 # Specify file to load
 
 
@@ -37,7 +39,7 @@ fname_out = '../data/cliff/water_depth_700_super_buoyancy_crevasse/glacier_surf_
 
 
 ice_thick = 800.0
-Hab = -10.0
+Hab = 25.0
 #Hab = 45.0
 #ice_thick = 135.0
 #Hab = ice_thick

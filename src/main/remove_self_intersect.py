@@ -6,9 +6,9 @@ pt = sort_boundary_nodes(bmesh)
 
 
 # Remove two points that must be determined by manual inspection
-#pts = vstack((pt[0:360,:],pt[372::,:]))## Identify which points to remove
+pts = vstack((pt[0:493,:],pt[496::,:]))## Identify which points to remove
 #pts = pt
-pts = vstack((pt[0:360,:],pt[272:412,:],pt[416::,:]))## Identify which points to remove
+#pts = vstack((pt[0:360,:],pt[372:412,:],pt[416::,:]))## Identify which points to remove
 
 #pts = vstack((pts[0:443,:],pts[448::,:]))## Identify which points to remove
 

@@ -35,87 +35,53 @@ from leopart import (
 
 import time
 
+import os
+
 import pylab as plt
 
 import logging
 logging.getLogger('FFC').setLevel(logging.ERROR)
 logging.getLogger('UFL').setLevel(logging.ERROR)
+parameters['ghost_mode']='shared_facet'
 
 set_log_level(50)
 set_log_active(False)
 
-plastic=True
-melange = False
-buttressing = 50e3
-buttressing_height_max = 1000.0 # In meters
-buttressing_height_min = 1000.0 # In meters
-t_buttress = 50.0
+# Turn on plastic failure
+plastic = True
+
 
 # Surface and bottom temperatures
 Ts = -20.0
 Tb = -20.0
 
-surf_slope =  0.02
-bed_slope =   -0.02
-left_vel = 2e3/material.secpera*material.time_factor
-
-istart = 200
-
-
-# Thick cliff
-cliff_type = 3
+melange = False
+buttressing = 1e-16
+buttressing_height_max = 86.0 # In meters
+buttressing_height_min = 714.0 # In meters
+t_buttress = 0.0
 
 
-
-# Geometric variables
-# Case 1: Medium cliff
-if cliff_type == 1:
-    ice_thick = 135.0
-    Hab = ice_thick
-    fname_dir = 'data/cliff/water_depth_0/'
-    xyield_min = 0.0
-    water_depth = 0.0
-# Case 2: Dry cliff
-elif cliff_type == 2:
-    ice_thick = 400.0
-    #Hab = 65.0
-    fname_dir = 'data/cliff/water_depth_290/'
-    xyield_min = 0.0
-    water_depth = 290.0
-# Case 3: Thick cliff
-if cliff_type == 3:
-    ice_thick = 800.0
-    Hab = 25.0
-    fname_dir = 'data/cliff/water_depth_700/'
-    xyield_min = 3e3
-    water_depth = ice_thick*910.0/1020 - Hab
-elif cliff_type == 4:
-    ice_thick = 135.0
-    Hab = ice_thick
-    fname_dir = 'data/cliff/water_depth_20/'
-    xyield_min = 0.0
-    water_depth = 20.0
-
+ice_thick = 800.0
+Hab = 25.0
 fname_dir = 'data/buttressing/water_depth_700_buttressing_'+str(buttressing/1e3)+'kPa_removed_'+str(t_buttress)+'day/'
-fname_base = 'data/buttressing/water_depth_700_buttressing_50.0kPa_removed_50.0day/glacier_surf_slope_0.02_bed_slope_-0.02_flux_2.0_high_res_T_-20.0_CFL/'
-#fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_T_'+str(Tb)+'_buttressing'+str(buttressing/1e3)+'kPa_CFL/'
-
-mesh_file = fname_base + 'glacier_cliff_'+str(istart).zfill(3)+'.xml'
-temp_file = fname_base + 'temp_'+str(istart).zfill(3)+'.hdf'
-
-tracer_file = fname_base + 'glacier_cliff_'+str(istart).zfill(3)+'.npz'
-tracer_data = np.load(tracer_file)
-mesh_data = Mesh(mesh_file)
-
-speed = np.sqrt(tracer_data['ux']**2+tracer_data['uz']**2)
-# Set length of domain and water dept
+xyield_min = 3e3
+water_depth = ice_thick*910.0/1020 - Hab
+# Set length of domain and water depth
 length= ice_thick*12
+#water_depth = ice_thick*910.0/1020 - Hab
+
+
 
 # Set mesh resolution and estimate approximate number of points in x/z dir
 dz = round(ice_thick/13.333333333/2)
 Nx = int(length/dz)
 Nz = int(ice_thick/dz)
 
+# Define geometry of domain
+surf_slope =  0.02
+bed_slope =   0.0
+left_vel = 0e3/material.secpera*material.time_factor
 
 
 L = length+ice_thick*0
@@ -141,50 +107,75 @@ def surf_fun(x):
    s = -water_depth + ice_thick + (surf_slope)*(L-x)#-  notch_slope*(L+notch_length-x)*(x<(L+notch_length))*(x>(L)) + notch_slope*(L-x-notch_length)*(x>(L-notch_length))*(x<=(L))
    return s
 
+# Initialize mesh
 start = time.time()
-# If the method below if we want a regular mesh, otherwise, we will use a unstructured mesh
-#mesh = GridModel(surf_fun,bot_fun,bed_fun,Nx=Nx,Nz=Nz,length=length)
 mesh = MeshModelPoly(surf_fun,bed_fun_np,bed_fun_np,Nx=Nx,Nz=Nz,length=length,dz=dz)
-
-
-start = time.time()
-# If the method below if we want a regular mesh, otherwise, we will use a unstructured mesh
-#mesh = GridModel(surf_fun,bot_fun,bed_fun,Nx=Nx,Nz=Nz,length=length)
-
-# Load mesh and replace the original mesh with the new mesh
-# Read mesh from file
-mesh.mesh=mesh_data
-mesh.generate_function_spaces()
-
 mesh.length = length*1.1
 print('Time to make mesh and basis functions',time.time()-start)
 
 
-n=len(tracer_data['xm'])
-xp =  np.vstack((tracer_data['xm'],tracer_data['zm'])).transpose().reshape(n,2)
-pstrain = tracer_data['strain']
-pepsII = tracer_data['epsII']
-ptemp = tracer_data['temp']
 
+
+#_____________________________________________
+# Create particles defined on mesh
+#xm,zm = mesh.get_coords();xmin = np.min(xm); xmax=np.max(xm);ymin = np.min(zm); ymax=np.max(zm)
+#xp = RandomRectangle(Point(xmin, ymin), Point(xmax, ymax)).generate([Nx*10, Nz*10])
+p_min = 8
+p_max = 16
+
+#p_min = 16
+#p_max = 32
+print('Generating particles')
+gen = RandomCell(mesh.mesh)
+xp = gen.generate(p_min)
+print('Done generating particles')
+#_____________________________________________
+# Define function space for strain and temperature function
+Vdg = FunctionSpace(mesh.mesh, 'DG',1)
+
+print('Initializing function spaces')
+strain_mesh, temp_mesh, epsII_mesh = Function(Vdg), Function(Vdg), Function(Vdg)
+
+# Initial conditions for strain and temp
+strain_fun = Expression("0.0", degree=1)
+temp_fun = temp_init(Ts,Tb,surf_fun, bed_fun,degree=1)
+
+# Create functions defined on mesh with initial values
+strain_mesh.assign(strain_init)
+temp_mesh.assign(interpolate(temp_fun,Vdg))
+epsII_mesh.assign(strain_init)
+
+# Particle values at nodes
+pstrain = assign_particle_values(xp, strain_fun)
+pepsII = assign_particle_values(xp, strain_fun)
+ptemp = assign_particle_values(xp, temp_fun)
+print('Done initializing function spaces')
+
+
+# Now we initialize the particle class
+print('Creating particles')
 p = particles(xp, [pstrain,ptemp,pepsII], mesh.mesh)
+print('Done particles')
 
 
-# Initialize temperature
-Q=FunctionSpace(mesh.mesh, "CG", 1)
-x = SpatialCoordinate(mesh.mesh)
-zb = bot_fun(x[0])
-zs = surf_fun(x[0])
-thick = zs-zb
-#T = project((Ts-Tb)*(x[1]-zb)/(zs-zb) + Tb + 273.15,Q)
+# Make sure we have enough particles per cell
+#AD = AddDelete(p, p_min, p_max, [strain_mesh, temp_mesh,epsII_mesh]) # Sweep over mesh to delete/insert particles
+#AD.do_sweep()
 
-
-
+(xp , pstrain , ptemp, pepsII) = (p. return_property(mesh , 0) ,
+    p. return_property(mesh , 1) ,
+    p. return_property(mesh , 2),
+    p. return_property(mesh , 3))
+#_____________________________________________
+# Initialize temperature model
+print('Initializing temperature')
 Tmodel = tempModel(mesh.mesh,Tb=Tb,Ts=Ts)
 x = SpatialCoordinate(mesh.mesh)
 zb = bot_fun(x[0])
 zs = surf_fun(x[0])
 Tmodel.set_mesh(mesh.mesh)
 Tmodel.set_temp(x,surf_fun,bot_fun,bed_fun)
+print('Done initializing temperature')
 
 #_____________________________________________
 # Viscosity and material properties
@@ -201,7 +192,7 @@ glenVisc.mu = 0.0
 #_____________________________________________
 # Viscosity and material properties
 # Set inflow velocity of the domain
-right_vel = None # Outflow velocity is not used
+right_vel = 0.0 # Outflow velocity is not used
 
 #_____________________________________________
 # Define our model and some parameters
@@ -226,62 +217,60 @@ model.friction = 4e6#/(surf_fun(0)-bed_fun(0))/model.rho_i/model.g # Friction co
 model.m = 1.0/3.0 # Friction exponent
 
 model.left_wall = 0.0
-model.right_wall = 1e9
-
+if melange == True:
+    model.right_wall = 5.5e3
+else:
+    model.right_wall = 1e6
 #_____________________________________________
 # Maximum time step
-time_step_secs = 86400.0#/16*2# Time step in seconds
+time_step_secs = 86400.0/16*2# Time step in seconds
+
 time_step = time_step_secs/material.time_factor # Convert time step to unit we are using
 
-u = Function(model.vector2)
-file = HDF5File(MPI.comm_world,temp_file,'r')
-file.read(u, "u")
-#model.u=u
-model.u_k = u
 
-type = 'Picard'
+#_____________________________________________
+# Start loop for simulation
+# Initialize time vector to zero
+t = 0.0
+it_type = 'Picard'
 
 max_length = 1.375*length# Regrid if length exceeds this value
 min_length = max_length-ice_thick # Set new length after regridding to this value
-#max_length = 11.1e3
-min_length = max_length-ice_thick # Set new length after regridding to this value
-#min_length = max_length
-#min_length = 8.1e3
 model.mesh.length = max_length # Set this as the max length of the mesh--doesn't actually do anything
-save_files = True# Set to True if we want to save output files
+save_files = True # Set to True if we want to save output files
+#fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_T_'+str(Tb)+'_buttressing'+str(buttressing/1e3)+'kPa_CFL/'
+fname_base = fname_dir + 'glacier_surf_slope_'+str(surf_slope)+'_bed_slope_'+str(bed_slope)+'_flux_'+str(left_vel/1e3)+'_high_res_T_'+str(Tb)+'_CFL/'
+
+if not os.path.exists(fname_base):
+    os.makedirs(fname_base)
 
 
+if save_files==True:
+    import shutil
+    shutil.copy2('glacier_test_buoyancy.py', fname_base+'glacier_test_buoyancy.py')
+    shutil.copy2('stokes2Dve.py', fname_base+'stokes2Dve.py')
 
-t=tracer_data['t'].item()
-print('Start time',t*365)
-i = istart+1
 
-
-Q0 = FunctionSpace(model.mesh.mesh, "DG", 0)
-
-#model.mesh.min_grid_spacing = 35.0
 input_flux = left_vel*(surf_fun(0.0)-bot_fun(0.0)) # Define input flux at left edge of the domain
-CFL = 0.2
 CFL = 1.0
+model.u_k = None
 tau = 0.1*60*60/(60*60*24*365.24) # Relaxation time for upstream plastic strain
+i =0
 model.strain = Function(model.mesh.Q)
-#L2_strain = []
-#tlist = []
-model.deps_dt = None
-model.deps_dt_old = None
-model.deps_dt_older = None
+L2_strain = []
+tlist = []
 model.method = 1
 model.buttressing = buttressing # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
 model.buttressing_height_max = buttressing_height_max # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
 model.buttressing_height_min = buttressing_height_min # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
 
-p_min = 8
-p_max = 16
-model.buttressing =1e-32 # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
+model.buttressing = 1e-32
 for i in range(i,100000):
    tday = t*365
-   model.buttressing = np.maximum(buttressing*(1-tday/t_buttress),1e-16) # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
-   print(tday,model.buttressing/1e3)
+   #model.buttressing = np.maximum(buttressing*(1-tday/t_buttress),1e-16) # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
+   #model.buttressing_height_max = np.maximum(buttressing_height_max*(1-tday/t_buttress),1e-16) # Apply buttressing force (in Pa) in x-direction to portion of ice under water???
+   #model.buttressing_height_min = np.maximum(buttressing_height_min*(1-tday/t_buttress),1e-16) # Ap
+   model.buttressing = 1e-16
    #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh))/assemble(Constant(1.0)*dx(model.mesh.mesh)))
    #L2_strain.append(assemble(model.strain*dx(model.mesh.mesh)))
    #tlist.append(t)
@@ -322,11 +311,14 @@ for i in range(i,100000):
        remesh_elastic=False
        model.mesh.length=min_length
 
+   #if model.mesh.mesh.hmax()/model.mesh.mesh.hmin() > 10.0:
+    #   remesh_elastic=False
+     #  model.mesh.length=min_length
 
    quality=np.min(MeshQuality.radius_ratios(model.mesh.mesh).array())
    if quality<0.1:
        remesh_elastic=False
-       model.mesh.length=max_length
+       model.mesh.length=min_length
 
    #remesh_elastic = False
    print(remesh_elastic)
@@ -343,15 +335,15 @@ for i in range(i,100000):
           #eta_visc_m = model.tracers.nodes_to_tracers(model.eta_visc)
           #eta_plas_m = model.tracers.nodes_to_tracers(model.eta_plas)
           #eta_m = model.tracers.nodes_to_tracers(model.eta)
-          fname =fname_base + 'glacier_cliff_no_buttressing'+str(i).zfill(3)+'.npz'
+          fname =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.npz'
           print(fname)
           np.savez(fname, t=t, xm=xp[:,0],zm=xp[:,1],speed=speed,ux=ux,uz=uz,strain=pstrain,
                epsII=pepsII/material.time_factor,temp=ptemp)
 
-          mesh_file_name =fname_base + 'glacier_cliff_no_buttressing'+str(i).zfill(3)+'.xml'
+          mesh_file_name =fname_base + 'glacier_cliff_'+str(i).zfill(3)+'.xml'
           mesh_file = File(mesh_file_name)
           mesh_file << model.mesh.mesh
-          temp_file_name = fname_base + 'temp_no_buttressing'+str(i).zfill(3)+'.hdf'
+          temp_file_name = fname_base + 'temp_'+str(i).zfill(3)+'.hdf'
           temp_file=HDF5File(model.mesh.mesh.mpi_comm(), temp_file_name, 'w')
           temp_file.write(u,'u')
           temp_file.write(model.strain,'strain')
@@ -426,6 +418,9 @@ for i in range(i,100000):
        ax.plot(xx,bot_fun(xx),color='brown',linewidth=2)
        ax.plot(xx,bed_fun_np(xx),'--k',linewidth=2)
        ax.plot(xs,surf_fun(xs),'--',color='gray')
+       if melange == True:
+           plt.gca()
+           plt.axvline(model.right_wall,linestyle='--',color='k')
    ax2.spines['bottom'].set_visible(True)
    ax2.set_xticks([0,3e3,10*ice_thick,max_length])
    ax2.set_xticklabels([0,3,10*ice_thick/1e3,max_length/1e3])
@@ -438,12 +433,18 @@ for i in range(i,100000):
    plt.pause(1e-16);
    print('Time step',time_step,'Mesh quality',model.mesh.mesh.hmax()/model.mesh.mesh.hmin(),'quality ratios',quality,'number of negative epsII',sum(pepsII<0),'Percent yielded',np.sum(pstrain>0)/len(pstrain),'Maximum strain',np.max(pstrain))
 
-
    # Print some diagnostics to screen for debugging purpose
    t = t+time_step
    print('*******************************************')
    print('Time:  ',t*material.time_factor/material.secpera,'Time step',time_step)
    print(np.max(u.compute_vertex_values()))
    print('*******************************************')
-   if t>2.0:
+   if t>1.01:
        break
+
+
+#if model.method==1:
+#    plt.figure(4);plt.plot(tlist,L2_strain,label=time_step_secs)
+#else:
+#    plt.figure(4);plt.plot(tlist,L2_strain,'--',label=time_step_secs)
+#plt.legend()

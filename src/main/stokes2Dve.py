@@ -222,7 +222,7 @@ class Stokes2D:
 
        sea_level = self.sea_level
        buttressing_height_min = self.buttressing_height_min
-       buttressing_height_max = self.buttressing_height_min
+       buttressing_height_max = self.buttressing_height_max
        x,z = self.mesh.get_coords()
        left_wall = self.left_wall #np.min(x)
        right_wall = self.right_wall#np.max(x)
@@ -642,6 +642,8 @@ class Stokes2D:
        #Temp = self.tempModel.update(u_eff,dt_m,self.boundary_parts)
        if self.u_k!=None:
            self.u_k = interpolate(self.u_k,self.vector2)
+
+
 
 
        self.strain = strain
